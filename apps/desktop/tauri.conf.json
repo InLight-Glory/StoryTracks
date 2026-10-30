@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "StoryTracks",
+  "version": "0.1.0",
+  "identifier": "com.storytracks.desktop",
+  "build": { "beforeDevCommand": "npm run dev", "beforeBuildCommand": "npm run build", "devUrl": "http://127.0.0.1:5173", "frontendDist": "../../dist/web" },
+  "app": {
+    "windows": [{ "title": "StoryTracks", "width": 1440, "height": 960, "minWidth": 800, "minHeight": 600, "backgroundColor": "#101513" }],
+    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src ipc: http://ipc.localhost; object-src 'none'" }
+  },
+  "bundle": { "active": true, "targets": ["nsis"], "icon": ["icons/icon.ico"], "windows": { "webviewInstallMode": { "type": "offlineInstaller" }, "nsis": { "installMode": "currentUser", "displayLanguageSelector": false } } }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+target/
+.local/
+*.log
+.env
+apps/php/config.php
+playwright-report/

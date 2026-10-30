@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/storytracks-core", "apps/desktop"]
+resolver = "2"
