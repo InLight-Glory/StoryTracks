@@ -73,7 +73,44 @@ export const projectSchema = z.object({
   description: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  metadata: z.record(z.string()),
+  metadata: z.record(z.string(), z.string()),
+  workbook: z
+    .object({
+      templateId: z.string(),
+      prompts: z.array(
+        z.object({
+          id,
+          category: z.string(),
+          question: z.string(),
+          answer: z.string(),
+          include: z.boolean(),
+        }),
+      ),
+      world: z.array(
+        z.object({
+          id,
+          category: z.string(),
+          title: z.string(),
+          description: z.string(),
+          include: z.boolean(),
+        }),
+      ),
+      questions: z.array(
+        z.object({
+          id,
+          statement: z.string(),
+          source: z.string(),
+          candidates: z.array(z.string()).max(12),
+          question: z.string(),
+          insight: z.string(),
+          alternatives: z.string(),
+          audience: z.string(),
+          hook: z.string(),
+          include: z.boolean(),
+        }),
+      ),
+    })
+    .optional(),
   sections: z.array(z.object({ id, title: z.string(), ...state })),
   chapters: z.array(
     z.object({
@@ -81,7 +118,7 @@ export const projectSchema = z.object({
       sectionId: id,
       title: z.string(),
       manualLabel: z.string().nullable(),
-      metadata: z.record(z.string()),
+      metadata: z.record(z.string(), z.string()),
       ...state,
     }),
   ),
@@ -92,11 +129,19 @@ export const projectSchema = z.object({
       name: z.string(),
       title: z.string(),
       blocks: z.array(blockSchema),
+      description: z.string().optional(),
       ...weights,
     }),
   ),
   notes: z.array(
-    z.object({ id, ownerId: id, text: z.string(), include: z.boolean() }),
+    z.object({
+      id,
+      ownerId: id,
+      text: z.string(),
+      include: z.boolean(),
+      canvasArea: z.enum(["subcontext", "highlight"]).optional(),
+      title: z.string().optional(),
+    }),
   ),
   resources: z.array(
     z.object({
@@ -184,8 +229,12 @@ export function newProject(name: string, description = ""): Project {
   };
 }
 export function getItem(p: Project, itemId: string): Item | undefined {
-  return [...p.sections, ...p.chapters, ...p.nodes].find(
-    (i) => i.id === itemId,
+  // Parent lookups usually end in the small section/chapter lists. Avoid
+  // allocating a copy of the entire book for every inherited state check.
+  return (
+    p.sections.find((i) => i.id === itemId) ||
+    p.chapters.find((i) => i.id === itemId) ||
+    p.nodes.find((i) => i.id === itemId)
   );
 }
 export function ancestors(p: Project, item: Item): Item[] {
@@ -374,12 +423,67 @@ export function detach(p: Project, n: StoryNode) {
     delete n.templateId;
   }
 }
+export function updateTemplate(
+  p: Project,
+  value: Project["templates"][number],
+) {
+  const old = p.templates.find((t) => t.id === value.id);
+  if (old) {
+    if (
+      old.title !== value.title ||
+      JSON.stringify(old.blocks) !== JSON.stringify(value.blocks)
+    )
+      p.nodes
+        .filter((n) => n.templateId === value.id)
+        .forEach((n) => assertEditable(p, n));
+    Object.assign(old, clone(value));
+  } else p.templates.push(clone(value));
+}
+export function addCanvasNote(
+  p: Project,
+  nodeId: string,
+  area: "subcontext" | "highlight",
+) {
+  const node = p.nodes.find((n) => n.id === nodeId);
+  if (!node || effective(p, node, "trashed"))
+    throw new Error("Select a node on the canvas first.");
+  assertEditable(p, node);
+  const note = {
+    id: uid(),
+    ownerId: nodeId,
+    canvasArea: area,
+    title: "",
+    text: "",
+    include: false,
+  };
+  p.notes.push(note);
+  return note;
+}
+export function editCanvasNote(
+  p: Project,
+  noteId: string,
+  patch: Partial<Project["notes"][number]> | null,
+) {
+  const note = p.notes.find((n) => n.id === noteId);
+  if (!note?.canvasArea) throw new Error("Canvas note not found.");
+  const previous = getItem(p, note.ownerId);
+  if (previous) assertEditable(p, previous);
+  if (patch?.ownerId && patch.ownerId !== p.id) {
+    const next = p.nodes.find((n) => n.id === patch.ownerId);
+    if (!next || effective(p, next, "trashed"))
+      throw new Error("Choose an available node.");
+    assertEditable(p, next);
+  }
+  if (patch === null) p.notes = p.notes.filter((n) => n.id !== noteId);
+  else Object.assign(note, patch);
+}
 export function duplicateProject(p: Project) {
   const copy = clone(p),
     ids = new Map<string, string>();
   const replace = (value: unknown, key = ""): any => {
     if (
       typeof value === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value) &&
       [
         "id",
         "chapterId",
@@ -407,6 +511,25 @@ export function duplicateProject(p: Project) {
 }
 export function validateProject(input: unknown): Project {
   const p = projectSchema.parse(input);
+  const mediaTypes = [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg",
+    "audio/mp4",
+    "audio/webm",
+    "application/pdf",
+    "text/plain",
+    "text/markdown",
+  ];
+  for (const a of p.assets)
+    if (!mediaTypes.includes(a.mediaType) || a.size > 25 * 1024 * 1024)
+      throw new Error("Unsupported attachment type or size.");
+  if (p.assets.reduce((sum, a) => sum + a.size, 0) > 100 * 1024 * 1024)
+    throw new Error("Project attachments exceed the 100 MB limit.");
   const seen = new Set<string>();
   for (const i of [
     p,
@@ -417,6 +540,9 @@ export function validateProject(input: unknown): Project {
     ...p.notes,
     ...p.resources,
     ...p.assets,
+    ...(p.workbook
+      ? [...p.workbook.prompts, ...p.workbook.world, ...p.workbook.questions]
+      : []),
     ...p.nodes.flatMap((n) => n.blocks),
     ...p.templates.flatMap((t) => t.blocks),
   ]) {
@@ -450,9 +576,16 @@ export function validateProject(input: unknown): Project {
   for (const r of p.resources)
     if (r.assetId && !p.assets.some((a) => a.id === r.assetId))
       throw new Error("Resource attachment is missing.");
-  for (const n of p.notes)
+  for (const n of p.notes) {
     if (n.ownerId !== p.id && !getItem(p, n.ownerId))
       throw new Error("Note owner is missing.");
+    if (
+      n.canvasArea &&
+      n.ownerId !== p.id &&
+      !p.nodes.some((node) => node.id === n.ownerId)
+    )
+      throw new Error("Canvas notes must connect to a node.");
+  }
   return p;
 }
 

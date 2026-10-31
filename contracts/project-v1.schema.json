@@ -1,291 +1,67 @@
 {
-  "$ref": "#/definitions/StoryTracksProject",
-  "definitions": {
-    "StoryTracksProject": {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "workbook": {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
-        "id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "revision": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 200
-        },
-        "description": {
+        "templateId": {
           "type": "string"
         },
-        "createdAt": {
-          "type": "string"
-        },
-        "updatedAt": {
-          "type": "string"
-        },
-        "metadata": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "sections": {
+        "prompts": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "title": {
-                "type": "string"
-              },
-              "locked": {
-                "type": "boolean"
-              },
-              "suspended": {
-                "type": "boolean"
-              },
-              "trashed": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "id",
-              "title",
-              "locked",
-              "suspended",
-              "trashed"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "chapters": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "sectionId": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "title": {
-                "type": "string"
-              },
-              "manualLabel": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "metadata": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "locked": {
-                "$ref": "#/definitions/StoryTracksProject/properties/sections/items/properties/locked"
-              },
-              "suspended": {
-                "$ref": "#/definitions/StoryTracksProject/properties/sections/items/properties/suspended"
-              },
-              "trashed": {
-                "$ref": "#/definitions/StoryTracksProject/properties/sections/items/properties/trashed"
-              }
-            },
-            "required": [
-              "id",
-              "sectionId",
-              "title",
-              "manualLabel",
-              "metadata",
-              "locked",
-              "suspended",
-              "trashed"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "chapterId": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "title": {
-                "type": "string"
-              },
-              "kind": {
                 "type": "string",
-                "enum": [
-                  "beat",
-                  "scene",
-                  "note",
-                  "turn"
-                ],
-                "default": "beat"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
               },
-              "blocks": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "$ref": "#/definitions/StoryTracksProject/properties/id"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "text",
-                        "image",
-                        "audio"
-                      ]
-                    },
-                    "text": {
-                      "type": "string",
-                      "default": ""
-                    },
-                    "assetId": {
-                      "$ref": "#/definitions/StoryTracksProject/properties/id"
-                    },
-                    "caption": {
-                      "type": "string",
-                      "default": ""
-                    },
-                    "alt": {
-                      "type": "string",
-                      "default": ""
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "type"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "templateId": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "locked": {
-                "$ref": "#/definitions/StoryTracksProject/properties/sections/items/properties/locked"
-              },
-              "suspended": {
-                "$ref": "#/definitions/StoryTracksProject/properties/sections/items/properties/suspended"
-              },
-              "trashed": {
-                "$ref": "#/definitions/StoryTracksProject/properties/sections/items/properties/trashed"
-              },
-              "importance": {
-                "type": "integer",
-                "minimum": 2,
-                "maximum": 11
-              },
-              "liberty": {
-                "type": "integer",
-                "minimum": 2,
-                "maximum": 11
-              },
-              "beginning": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 100
-              },
-              "ending": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 100
-              }
-            },
-            "required": [
-              "id",
-              "chapterId",
-              "title",
-              "blocks",
-              "locked",
-              "suspended",
-              "trashed",
-              "importance",
-              "liberty",
-              "beginning",
-              "ending"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "templates": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "name": {
+              "category": {
                 "type": "string"
               },
-              "title": {
+              "question": {
                 "type": "string"
               },
-              "blocks": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/StoryTracksProject/properties/nodes/items/properties/blocks/items"
-                }
-              },
-              "importance": {
-                "$ref": "#/definitions/StoryTracksProject/properties/nodes/items/properties/importance"
-              },
-              "liberty": {
-                "$ref": "#/definitions/StoryTracksProject/properties/nodes/items/properties/liberty"
-              },
-              "beginning": {
-                "$ref": "#/definitions/StoryTracksProject/properties/nodes/items/properties/beginning"
-              },
-              "ending": {
-                "$ref": "#/definitions/StoryTracksProject/properties/nodes/items/properties/ending"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "title",
-              "blocks",
-              "importance",
-              "liberty",
-              "beginning",
-              "ending"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "notes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "ownerId": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "text": {
+              "answer": {
                 "type": "string"
               },
               "include": {
@@ -294,116 +70,554 @@
             },
             "required": [
               "id",
-              "ownerId",
-              "text",
+              "category",
+              "question",
+              "answer",
               "include"
-            ],
-            "additionalProperties": false
+            ]
           }
         },
-        "resources": {
+        "world": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "category": {
+                "type": "string"
               },
               "title": {
                 "type": "string"
               },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "historical_transcript",
-                  "reference"
-                ]
+              "description": {
+                "type": "string"
               },
-              "text": {
+              "include": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "category",
+              "title",
+              "description",
+              "include"
+            ]
+          }
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "statement": {
                 "type": "string"
               },
               "source": {
                 "type": "string"
               },
-              "createdAt": {
+              "candidates": {
+                "maxItems": 12,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "question": {
+                "type": "string"
+              },
+              "insight": {
+                "type": "string"
+              },
+              "alternatives": {
+                "type": "string"
+              },
+              "audience": {
+                "type": "string"
+              },
+              "hook": {
                 "type": "string"
               },
               "include": {
                 "type": "boolean"
-              },
-              "assetId": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
               }
             },
             "required": [
               "id",
-              "title",
-              "kind",
-              "text",
+              "statement",
               "source",
-              "createdAt",
+              "candidates",
+              "question",
+              "insight",
+              "alternatives",
+              "audience",
+              "hook",
               "include"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "assets": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "$ref": "#/definitions/StoryTracksProject/properties/id"
-              },
-              "filename": {
-                "type": "string"
-              },
-              "mediaType": {
-                "type": "string"
-              },
-              "data": {
-                "type": "string"
-              },
-              "hash": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "size": {
-                "type": "integer",
-                "minimum": 0
-              }
-            },
-            "required": [
-              "id",
-              "filename",
-              "mediaType",
-              "data",
-              "hash",
-              "size"
-            ],
-            "additionalProperties": false
+            ]
           }
         }
       },
       "required": [
-        "schemaVersion",
-        "id",
-        "revision",
-        "name",
-        "description",
-        "createdAt",
-        "updatedAt",
-        "metadata",
-        "sections",
-        "chapters",
-        "nodes",
-        "templates",
-        "notes",
-        "resources",
-        "assets"
-      ],
-      "additionalProperties": false
+        "templateId",
+        "prompts",
+        "world",
+        "questions"
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "suspended": {
+            "type": "boolean"
+          },
+          "trashed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "locked",
+          "suspended",
+          "trashed"
+        ]
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "sectionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "manualLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "suspended": {
+            "type": "boolean"
+          },
+          "trashed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "sectionId",
+          "title",
+          "manualLabel",
+          "metadata",
+          "locked",
+          "suspended",
+          "trashed"
+        ]
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "chapterId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "default": "beat",
+            "type": "string",
+            "enum": [
+              "beat",
+              "scene",
+              "note",
+              "turn"
+            ]
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "image",
+                    "audio"
+                  ]
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "assetId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "caption": {
+                  "default": "",
+                  "type": "string"
+                },
+                "alt": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type"
+              ]
+            }
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "suspended": {
+            "type": "boolean"
+          },
+          "trashed": {
+            "type": "boolean"
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 11
+          },
+          "liberty": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 11
+          },
+          "beginning": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "ending": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "chapterId",
+          "title",
+          "blocks",
+          "locked",
+          "suspended",
+          "trashed",
+          "importance",
+          "liberty",
+          "beginning",
+          "ending"
+        ]
+      }
+    },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "image",
+                    "audio"
+                  ]
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "assetId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "caption": {
+                  "default": "",
+                  "type": "string"
+                },
+                "alt": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type"
+              ]
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 11
+          },
+          "liberty": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 11
+          },
+          "beginning": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "ending": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "title",
+          "blocks",
+          "importance",
+          "liberty",
+          "beginning",
+          "ending"
+        ]
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "text": {
+            "type": "string"
+          },
+          "include": {
+            "type": "boolean"
+          },
+          "canvasArea": {
+            "type": "string",
+            "enum": [
+              "subcontext",
+              "highlight"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "text",
+          "include"
+        ]
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "historical_transcript",
+              "reference"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "include": {
+            "type": "boolean"
+          },
+          "assetId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "text",
+          "source",
+          "createdAt",
+          "include"
+        ]
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "mediaType",
+          "data",
+          "hash",
+          "size"
+        ]
+      }
     }
   },
-  "$schema": "http://json-schema.org/draft-07/schema#"
+  "required": [
+    "schemaVersion",
+    "id",
+    "revision",
+    "name",
+    "description",
+    "createdAt",
+    "updatedAt",
+    "metadata",
+    "sections",
+    "chapters",
+    "nodes",
+    "templates",
+    "notes",
+    "resources",
+    "assets"
+  ]
 }

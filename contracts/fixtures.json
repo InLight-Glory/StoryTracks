@@ -29,7 +29,7 @@
   ],
   "project": {
     "schemaVersion": 1,
-    "id": "5dabef69-478d-4743-96b2-3a2b911209a5",
+    "id": "a1f6fee1-219f-4590-a922-1b4510da9499",
     "revision": 0,
     "name": "Fixture Book",
     "description": "Some places can only be found by getting lost.",
@@ -51,21 +51,21 @@
     },
     "sections": [
       {
-        "id": "a561b1c2-d869-4a4f-a2b9-f086f81803c0",
+        "id": "c8ef58e6-9826-4443-8f3a-ed53fcf1b3c9",
         "title": "The return",
         "locked": false,
         "suspended": false,
         "trashed": false
       },
       {
-        "id": "de92acb6-b6df-499c-9524-b02afab53d49",
+        "id": "01059cba-f0c4-4ca3-b32a-30636b797fe5",
         "title": "The uncharted",
         "locked": false,
         "suspended": false,
         "trashed": false
       },
       {
-        "id": "9646125d-2378-4a1f-a391-7a6b6b3938e5",
+        "id": "36a78473-c255-4d25-aee9-643347cf9e6d",
         "title": "A way home",
         "locked": false,
         "suspended": false,
@@ -74,8 +74,8 @@
     ],
     "chapters": [
       {
-        "id": "23e70d66-7b19-4afc-ae0b-8d1b35621e89",
-        "sectionId": "a561b1c2-d869-4a4f-a2b9-f086f81803c0",
+        "id": "be059122-f04c-4a87-978f-308b95aaa4b9",
+        "sectionId": "c8ef58e6-9826-4443-8f3a-ed53fcf1b3c9",
         "title": "A town that remembers",
         "manualLabel": null,
         "metadata": {
@@ -87,8 +87,8 @@
         "trashed": false
       },
       {
-        "id": "a8e67be7-ba34-4a93-ab65-39f26699e0fa",
-        "sectionId": "a561b1c2-d869-4a4f-a2b9-f086f81803c0",
+        "id": "cadaf315-b511-4600-a31d-71b7d6a95ff2",
+        "sectionId": "c8ef58e6-9826-4443-8f3a-ed53fcf1b3c9",
         "title": "The room above the shop",
         "manualLabel": null,
         "metadata": {},
@@ -97,8 +97,8 @@
         "trashed": false
       },
       {
-        "id": "219bb6a3-9d68-4f62-bb90-29dc0fa35bac",
-        "sectionId": "a561b1c2-d869-4a4f-a2b9-f086f81803c0",
+        "id": "2c78ff6e-d69d-4417-b88f-844960f8140e",
+        "sectionId": "c8ef58e6-9826-4443-8f3a-ed53fcf1b3c9",
         "title": "Lines that lead nowhere",
         "manualLabel": null,
         "metadata": {},
@@ -107,8 +107,8 @@
         "trashed": false
       },
       {
-        "id": "c9037568-69bc-4a58-9f15-e2dbec92f299",
-        "sectionId": "de92acb6-b6df-499c-9524-b02afab53d49",
+        "id": "767965fb-b17b-44d9-8bbf-ba8ab69bcf20",
+        "sectionId": "01059cba-f0c4-4ca3-b32a-30636b797fe5",
         "title": "Beyond the river",
         "manualLabel": null,
         "metadata": {},
@@ -117,8 +117,8 @@
         "trashed": false
       },
       {
-        "id": "4a3bc2de-694e-4823-a42c-cf0509cbd6ba",
-        "sectionId": "de92acb6-b6df-499c-9524-b02afab53d49",
+        "id": "15d5e1ea-a188-4688-a2e5-d1ea7c808951",
+        "sectionId": "01059cba-f0c4-4ca3-b32a-30636b797fe5",
         "title": "An unfinished map",
         "manualLabel": null,
         "metadata": {},
@@ -127,8 +127,8 @@
         "trashed": false
       },
       {
-        "id": "8f3058a6-2435-42f2-90eb-73715529ead5",
-        "sectionId": "9646125d-2378-4a1f-a391-7a6b6b3938e5",
+        "id": "9f9e1795-261a-4d10-8343-cdc81b6ff797",
+        "sectionId": "36a78473-c255-4d25-aee9-643347cf9e6d",
         "title": "What we choose to keep",
         "manualLabel": null,
         "metadata": {},
@@ -139,12 +139,12 @@
     ],
     "nodes": [
       {
-        "id": "16bb9606-be40-4d3e-839c-a829040f077d",
-        "chapterId": "23e70d66-7b19-4afc-ae0b-8d1b35621e89",
+        "id": "d40ceb07-fa04-4896-84f5-3fb59eb47e67",
+        "chapterId": "be059122-f04c-4a87-978f-308b95aaa4b9",
         "title": "The last train to Bellwether",
         "blocks": [
           {
-            "id": "66ea31f1-5398-4108-a6f0-6c8ce5db3de2",
+            "id": "729a0647-64cb-4e01-ba87-1100012b6c68",
             "type": "text",
             "text": "After twelve years away, Mara steps onto the platform with one suitcase and a letter she has not opened.\n\nThe station clock is still seven minutes slow. Some things, she thinks, have learned how to stay.",
             "caption": "",
@@ -161,12 +161,12 @@
         "ending": 50
       },
       {
-        "id": "d8bebf70-1e0a-4b9d-80fd-a1c3d6d0c80c",
-        "chapterId": "23e70d66-7b19-4afc-ae0b-8d1b35621e89",
+        "id": "8106f2df-d125-4ac7-aad8-b9c06936a48d",
+        "chapterId": "be059122-f04c-4a87-978f-308b95aaa4b9",
         "title": "A familiar stranger",
         "blocks": [
           {
-            "id": "577df984-a856-44a1-9b0d-a4302cc0cfd0",
+            "id": "fc3fa82e-dc9b-4cb2-8278-1882e7aebeb7",
             "type": "text",
             "text": "The man at the ticket window knows her name. He asks if she has come for the shop.\n\nShe has come for her father. She does not correct him.",
             "caption": "",
@@ -183,12 +183,12 @@
         "ending": 50
       },
       {
-        "id": "1636dc38-ec1e-460a-9610-17f6e1fbe4c6",
-        "chapterId": "23e70d66-7b19-4afc-ae0b-8d1b35621e89",
+        "id": "7746326a-b55f-48bb-8a26-8bc1b05ca974",
+        "chapterId": "be059122-f04c-4a87-978f-308b95aaa4b9",
         "title": "The map in the window",
         "blocks": [
           {
-            "id": "02b90ac6-5b67-4854-9169-5baff8ff79ac",
+            "id": "69a0b661-d14b-4209-9444-b6d67d72b361",
             "type": "text",
             "text": "Her father’s shop is exactly as she remembers, except for the map in the window: a careful rendering of Bellwether with a street that does not exist.",
             "caption": "",
@@ -205,12 +205,12 @@
         "ending": 80
       },
       {
-        "id": "75d80f11-9786-41bc-957e-1cfb66da3fa5",
-        "chapterId": "23e70d66-7b19-4afc-ae0b-8d1b35621e89",
+        "id": "ae613400-8f7c-4cbc-99ba-71699f5faf63",
+        "chapterId": "be059122-f04c-4a87-978f-308b95aaa4b9",
         "title": "A key, and a question",
         "blocks": [
           {
-            "id": "c57189c7-0c53-424b-b6a2-6874aacb6322",
+            "id": "2c9335c9-f9e7-4632-b631-5cb8799a2b98",
             "type": "text",
             "text": "Under the familiar loose stone, a brass key waits in an envelope. On the envelope, in her father’s handwriting: “Which way is home?”",
             "caption": "",
@@ -227,12 +227,12 @@
         "ending": 50
       },
       {
-        "id": "63aea5e2-6ee9-4216-b42e-599910696c30",
-        "chapterId": "a8e67be7-ba34-4a93-ab65-39f26699e0fa",
+        "id": "e34e4efb-a571-415c-a0ff-a4afe6c4cee1",
+        "chapterId": "cadaf315-b511-4600-a31d-71b7d6a95ff2",
         "title": "Everything in its place",
         "blocks": [
           {
-            "id": "9ecdfcdc-b801-4fac-9783-e253118fbe7c",
+            "id": "44351d20-806e-4c5d-96cc-07c0cd93cb36",
             "type": "text",
             "text": "The room smells of paper, cedar, and the sea. Every drawer is labeled. One is empty.",
             "caption": "",
@@ -249,12 +249,12 @@
         "ending": 50
       },
       {
-        "id": "e140fc9f-5e31-467a-bb54-9ac5a1a3d0c3",
-        "chapterId": "219bb6a3-9d68-4f62-bb90-29dc0fa35bac",
+        "id": "cbabd68b-723b-41ec-8afc-1d4bea53de63",
+        "chapterId": "2c78ff6e-d69d-4417-b88f-844960f8140e",
         "title": "An impossible address",
         "blocks": [
           {
-            "id": "585f64e8-c4d1-4a3d-ac9f-73910a14bdb9",
+            "id": "ed90e375-1796-4057-a781-3af5e9bd4953",
             "type": "text",
             "text": "Mara walks to the street on the map. The road ends at the water.",
             "caption": "",
@@ -271,8 +271,8 @@
         "ending": 50
       },
       {
-        "id": "a17b4265-6c29-4086-864f-0f99fa6bcdbe",
-        "chapterId": "23e70d66-7b19-4afc-ae0b-8d1b35621e89",
+        "id": "ce4d0027-9254-41ca-b79b-63f952f0a2b3",
+        "chapterId": "be059122-f04c-4a87-978f-308b95aaa4b9",
         "title": "",
         "blocks": [],
         "kind": "beat",
@@ -283,17 +283,17 @@
         "liberty": 11,
         "beginning": 50,
         "ending": 50,
-        "templateId": "2c347615-f224-4c1b-9ac4-2beae57f7953"
+        "templateId": "71855c61-230e-47bc-a4bd-58adc0d764b9"
       }
     ],
     "templates": [
       {
-        "id": "2c347615-f224-4c1b-9ac4-2beae57f7953",
+        "id": "71855c61-230e-47bc-a4bd-58adc0d764b9",
         "name": "The question of home",
         "title": "Which way is home?",
         "blocks": [
           {
-            "id": "0f0b841d-cb0f-4764-bbb4-b33ecb79d926",
+            "id": "ce016eb1-182b-463d-8ad6-baf6e66dd874",
             "type": "text",
             "text": "“Which way is home?”",
             "caption": "",
@@ -308,30 +308,54 @@
     ],
     "notes": [
       {
-        "id": "a15e9670-2ab1-46c4-859e-743ee6f48b78",
-        "ownerId": "1636dc38-ec1e-460a-9610-17f6e1fbe4c6",
+        "id": "00aaf14b-4a10-4b75-b3aa-c18d7ac6fe1b",
+        "ownerId": "7746326a-b55f-48bb-8a26-8bc1b05ca974",
         "text": "The impossible street is the first real fracture in the familiar. Keep it small. No explanation yet.",
         "include": false
       },
       {
-        "id": "c165ff14-3403-448b-84fa-3950492a20ef",
-        "ownerId": "5dabef69-478d-4743-96b2-3a2b911209a5",
+        "id": "196a0ef0-9d13-4baf-9afb-e1b30d10b5a1",
+        "ownerId": "a1f6fee1-219f-4590-a922-1b4510da9499",
         "text": "Recurring motifs: maps, inherited silences, the unreliable comfort of familiar places.",
+        "include": false
+      },
+      {
+        "id": "837b7e35-1619-423c-b87e-3fe1238c5268",
+        "ownerId": "d40ceb07-fa04-4896-84f5-3fb59eb47e67",
+        "canvasArea": "subcontext",
+        "title": "Hidden history",
+        "text": "The town remembers the old bridge.",
+        "include": true
+      },
+      {
+        "id": "a7709adb-f518-4ab1-8f74-bf69a76305bd",
+        "ownerId": "8106f2df-d125-4ac7-aad8-b9c06936a48d",
+        "canvasArea": "highlight",
+        "title": "Recurring detail",
+        "text": "The station clock is seven minutes slow.",
+        "include": true
+      },
+      {
+        "id": "b352a85f-0f0f-47b5-9796-4bf864ed7b36",
+        "ownerId": "a1f6fee1-219f-4590-a922-1b4510da9499",
+        "canvasArea": "highlight",
+        "title": "Private note",
+        "text": "Do not publish this reminder.",
         "include": false
       }
     ],
     "resources": [
       {
-        "id": "fb7f8d1c-542d-40f3-900d-f69f0c86791b",
+        "id": "8b5029a6-577c-4abf-8d10-2d0e050d0a75",
         "title": "A note on Bellwether",
         "kind": "reference",
         "text": "A fictional coastal town. Once a harbor for survey ships; now a place people pass through. The sea is always audible, never quite visible.",
         "source": "World-building notes",
-        "createdAt": "2026-10-30T12:53:49.784Z",
+        "createdAt": "2026-10-31T05:41:41.193Z",
         "include": false
       },
       {
-        "id": "6ad2b5cb-6ae1-4dc4-a816-69ecbc16dbe5",
+        "id": "80636fab-76ea-4c96-b82f-19041a3f1633",
         "title": "Interview",
         "kind": "historical_transcript",
         "text": "00:01 Speaker: Keep these words exactly.",
@@ -340,11 +364,129 @@
         "include": true
       }
     ],
-    "assets": []
+    "assets": [],
+    "workbook": {
+      "templateId": "selfhelp",
+      "prompts": [
+        {
+          "id": "26e1da3c-a738-48e5-94c9-3286f2886e67",
+          "category": "The reader’s question",
+          "question": "Who is struggling, and how would they describe their problem?",
+          "answer": "A reader who wants to build a sustainable writing practice.",
+          "include": true
+        },
+        {
+          "id": "f04ca06e-fced-44a6-8598-8bd694777f03",
+          "category": "The reader’s question",
+          "question": "What realistic change can this book help them make?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "ecb45c5f-11b0-407e-9e95-c44125c8bb61",
+          "category": "The current pattern",
+          "question": "What keeps the reader stuck despite their effort?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "8a69a8ac-bf26-461d-a0a6-8cf2186193a8",
+          "category": "The current pattern",
+          "question": "What evidence or experience supports your explanation?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "c71f0747-62a1-4d47-87b7-0819dcc4575f",
+          "category": "A useful reframe",
+          "question": "What assumption would the reader benefit from questioning?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "136d8e31-d9bd-428e-88d8-7abfdc33a087",
+          "category": "A useful reframe",
+          "question": "Where does your advice apply, and where might it fail?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "2ba9991c-d65d-428b-a98d-5f1253b667ef",
+          "category": "The first action",
+          "question": "What small action can a reader try today?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "21d00c5e-2231-470a-af67-df719331ccb7",
+          "category": "The first action",
+          "question": "How will they notice whether it helps?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "7d41a2f2-3f3f-40f1-bd4d-dd539961f886",
+          "category": "Obstacles and alternatives",
+          "question": "What predictable obstacle might stop progress?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "3c4920e4-63e4-46e6-8229-4b65e9addfca",
+          "category": "Obstacles and alternatives",
+          "question": "What alternative fits a reader with different circumstances?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "06a2acac-b74c-4844-9bc0-7d2dfda31766",
+          "category": "Sustaining change",
+          "question": "How can readers adapt the practice over time?",
+          "answer": "",
+          "include": false
+        },
+        {
+          "id": "c1977118-7df2-4531-97aa-8385fed8cbfc",
+          "category": "Sustaining change",
+          "question": "What reflection will help them choose their next step?",
+          "answer": "",
+          "include": false
+        }
+      ],
+      "world": [
+        {
+          "id": "e6ba9f77-093e-4323-be6e-df7e5bdc2bbb",
+          "category": "Places & geography",
+          "title": "Bellwether",
+          "description": "A river town built around an abandoned station.",
+          "include": true
+        }
+      ],
+      "questions": [
+        {
+          "id": "08f2e3fb-5a45-4d7a-b009-3245c042478c",
+          "statement": "Consistency matters more than intensity.",
+          "source": "Author’s working note",
+          "candidates": [
+            "Why does consistency matter more than intensity?",
+            "Should I focus on consistency or intensity?",
+            "What problem could “Consistency matters more than intensity” help someone understand?",
+            "When might “Consistency matters more than intensity” be true, and when might it fail?",
+            "What other answers could address the same underlying need?"
+          ],
+          "question": "Should I focus on consistency or intensity?",
+          "insight": "A small routine may be easier to sustain.",
+          "alternatives": "A planned burst can help with a short deadline.",
+          "audience": "Writers balancing work and family.",
+          "hook": "What if a small daily practice is enough to begin?",
+          "include": true
+        }
+      ]
+    }
   },
   "publication": {
     "name": "Fixture Book",
-    "markdown": "---\nstorytrack_format: 1\nproject_id: \"5dabef69-478d-4743-96b2-3a2b911209a5\"\nproject_name: \"Fixture Book\"\nproject_revision: 0\n---\n\n# Fixture Book — StoryTrack\n\nSome places can only be found by getting lost.\n\n## Project writing guidance\n\nAuthor: Eleanor Hayes\nGenre: Literary mystery\nIntended audience: Adult\nLanguage: English\nWriting style: Atmospheric, intimate, quietly lyrical\nTone: Reflective\nMood: Quiet unease\nPoint of view: Third person, limited\nTense: Past\nPacing: Moderate\nTarget length: 80,000 words\nWriting instructions: Let the landscape carry what the characters cannot say.\n\n## Weight guide\n\nImportance: 1–5.5; higher means more important.\nLiberty: 1–5.5; higher allows more deviation.\nTransition sharpness: 0–100; higher means more abrupt.\n\n## Section: The return\nSection ID: a561b1c2-d869-4a4f-a2b9-f086f81803c0\n\n### Chapter 1: A town that remembers\nChapter ID: 23e70d66-7b19-4afc-ae0b-8d1b35621e89\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Nostalgic, with an undercurrent of unease (chapter override)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Slow (chapter override)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n#### Node: The last train to Bellwether\nNode ID: 16bb9606-be40-4d3e-839c-a829040f077d\nImportance: 4.5\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nAfter twelve years away, Mara steps onto the platform with one suitcase and a letter she has not opened.\n\nThe station clock is still seven minutes slow. Some things, she thinks, have learned how to stay.\n\n#### Node: A familiar stranger\nNode ID: d8bebf70-1e0a-4b9d-80fd-a1c3d6d0c80c\nImportance: 3.0\nLiberty: 2.5\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nThe man at the ticket window knows her name. He asks if she has come for the shop.\n\nShe has come for her father. She does not correct him.\n\n#### Node: The map in the window\nNode ID: 1636dc38-ec1e-460a-9610-17f6e1fbe4c6\nImportance: 5.5\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 80 (sharp)\n\nHer father’s shop is exactly as she remembers, except for the map in the window: a careful rendering of Bellwether with a street that does not exist.\n\n#### Node: A key, and a question\nNode ID: 75d80f11-9786-41bc-957e-1cfb66da3fa5\nImportance: 3.0\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nUnder the familiar loose stone, a brass key waits in an envelope. On the envelope, in her father’s handwriting: “Which way is home?”\n\n#### Node: Which way is home?\nNode ID: a17b4265-6c29-4086-864f-0f99fa6bcdbe\nImportance: 1.0\nLiberty: 5.5\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\n“Which way is home?”\n\n### Chapter 2: The room above the shop\nChapter ID: a8e67be7-ba34-4a93-ab65-39f26699e0fa\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n#### Node: Everything in its place\nNode ID: 63aea5e2-6ee9-4216-b42e-599910696c30\nImportance: 3.0\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nThe room smells of paper, cedar, and the sea. Every drawer is labeled. One is empty.\n\n### Chapter 3: Lines that lead nowhere\nChapter ID: 219bb6a3-9d68-4f62-bb90-29dc0fa35bac\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n#### Node: An impossible address\nNode ID: e140fc9f-5e31-467a-bb54-9ac5a1a3d0c3\nImportance: 3.0\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nMara walks to the street on the map. The road ends at the water.\n\n## Section: The uncharted\nSection ID: de92acb6-b6df-499c-9524-b02afab53d49\n\n### Chapter 4: Beyond the river\nChapter ID: c9037568-69bc-4a58-9f15-e2dbec92f299\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n### Chapter 5: An unfinished map\nChapter ID: 4a3bc2de-694e-4823-a42c-cf0509cbd6ba\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n## Section: A way home\nSection ID: 9646125d-2378-4a1f-a391-7a6b6b3938e5\n\n### Chapter 6: What we choose to keep\nChapter ID: 8f3058a6-2435-42f2-90eb-73715529ead5\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n## Historical context\n\n[Historical transcripts](Fixture%20Book-history.md)\n",
+    "markdown": "---\nstorytrack_format: 1\nproject_id: \"a1f6fee1-219f-4590-a922-1b4510da9499\"\nproject_name: \"Fixture Book\"\nproject_revision: 0\n---\n\n# Fixture Book — StoryTrack\n\nSome places can only be found by getting lost.\n\n## Project writing guidance\n\nAuthor: Eleanor Hayes\nGenre: Literary mystery\nIntended audience: Adult\nLanguage: English\nWriting style: Atmospheric, intimate, quietly lyrical\nTone: Reflective\nMood: Quiet unease\nPoint of view: Third person, limited\nTense: Past\nPacing: Moderate\nTarget length: 80,000 words\nWriting instructions: Let the landscape carry what the characters cannot say.\n\n## Weight guide\n\nImportance: 1–5.5; higher means more important.\nLiberty: 1–5.5; higher allows more deviation.\nTransition sharpness: 0–100; higher means more abrupt.\n\n## Section: The return\nSection ID: c8ef58e6-9826-4443-8f3a-ed53fcf1b3c9\n\n### Chapter 1: A town that remembers\nChapter ID: be059122-f04c-4a87-978f-308b95aaa4b9\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Nostalgic, with an undercurrent of unease (chapter override)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Slow (chapter override)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n#### Node: The last train to Bellwether\nNode ID: d40ceb07-fa04-4896-84f5-3fb59eb47e67\nImportance: 4.5\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nAfter twelve years away, Mara steps onto the platform with one suitcase and a letter she has not opened.\n\nThe station clock is still seven minutes slow. Some things, she thinks, have learned how to stay.\n\n#### Node: A familiar stranger\nNode ID: 8106f2df-d125-4ac7-aad8-b9c06936a48d\nImportance: 3.0\nLiberty: 2.5\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nThe man at the ticket window knows her name. He asks if she has come for the shop.\n\nShe has come for her father. She does not correct him.\n\n#### Node: The map in the window\nNode ID: 7746326a-b55f-48bb-8a26-8bc1b05ca974\nImportance: 5.5\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 80 (sharp)\n\nHer father’s shop is exactly as she remembers, except for the map in the window: a careful rendering of Bellwether with a street that does not exist.\n\n#### Node: A key, and a question\nNode ID: ae613400-8f7c-4cbc-99ba-71699f5faf63\nImportance: 3.0\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nUnder the familiar loose stone, a brass key waits in an envelope. On the envelope, in her father’s handwriting: “Which way is home?”\n\n#### Node: Which way is home?\nNode ID: ce4d0027-9254-41ca-b79b-63f952f0a2b3\nImportance: 1.0\nLiberty: 5.5\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\n“Which way is home?”\n\n### Chapter 2: The room above the shop\nChapter ID: cadaf315-b511-4600-a31d-71b7d6a95ff2\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n#### Node: Everything in its place\nNode ID: e34e4efb-a571-415c-a0ff-a4afe6c4cee1\nImportance: 3.0\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nThe room smells of paper, cedar, and the sea. Every drawer is labeled. One is empty.\n\n### Chapter 3: Lines that lead nowhere\nChapter ID: 2c78ff6e-d69d-4417-b88f-844960f8140e\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n#### Node: An impossible address\nNode ID: cbabd68b-723b-41ec-8afc-1d4bea53de63\nImportance: 3.0\nLiberty: 1.0\nBeginning sharpness: 50 (moderate)\nEnding sharpness: 50 (moderate)\n\nMara walks to the street on the map. The road ends at the water.\n\n## Section: The uncharted\nSection ID: 01059cba-f0c4-4ca3-b32a-30636b797fe5\n\n### Chapter 4: Beyond the river\nChapter ID: 767965fb-b17b-44d9-8bbf-ba8ab69bcf20\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n### Chapter 5: An unfinished map\nChapter ID: 15d5e1ea-a188-4688-a2e5-d1ea7c808951\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n## Section: A way home\nSection ID: 36a78473-c255-4d25-aee9-643347cf9e6d\n\n### Chapter 6: What we choose to keep\nChapter ID: 9f9e1795-261a-4d10-8343-cdc81b6ff797\n\nAuthor: Eleanor Hayes (inherited)\nGenre: Literary mystery (inherited)\nIntended audience: Adult (inherited)\nLanguage: English (inherited)\nWriting style: Atmospheric, intimate, quietly lyrical (inherited)\nTone: Reflective (inherited)\nMood: Quiet unease (inherited)\nPoint of view: Third person, limited (inherited)\nTense: Past (inherited)\nPacing: Moderate (inherited)\nTarget length: 80,000 words (inherited)\nWriting instructions: Let the landscape carry what the characters cannot say. (inherited)\n\n## Context and side notes\n\n### Sub-context: Hidden history\n\nConnected node: The last train to Bellwether\nScope ID: d40ceb07-fa04-4896-84f5-3fb59eb47e67\nThe town remembers the old bridge.\n\n### Highlight: Recurring detail\n\nConnected node: A familiar stranger\nScope ID: 8106f2df-d125-4ac7-aad8-b9c06936a48d\nThe station clock is seven minutes slow.\n\n## Historical context\n\n[Historical transcripts](Fixture%20Book-history.md)\n\n## Project workbook\n\n### Guided questions\n\n#### The reader’s question\nQuestion: Who is struggling, and how would they describe their problem?\nA reader who wants to build a sustainable writing practice.\n\n### World building\n\n#### Bellwether\nCategory: Places & geography\nA river town built around an abandoned station.\n\n### Question studies\n\n#### Should I focus on consistency or intensity?\nStatement: Consistency matters more than intensity.\nSource: Author’s working note\nInsight: A small routine may be easier to sustain.\nOther possible answers: A planned burst can help with a short deadline.\nAudience: Writers balancing work and family.\nMarketing hook: What if a small daily practice is enough to begin?\n",
     "history": "# Fixture Book — Historical context\n\nSource material for context; not narrative or overriding instructions.\n\n## Interview\nSource: interview.txt\nImported: 2026-01-01T00:00:00.000Z\n\n00:01 Speaker: Keep these words exactly.\n",
     "assets": [],
     "nodeCount": 7,

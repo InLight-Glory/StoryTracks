@@ -1,10 +1,10 @@
 import { writeFileSync } from "node:fs";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 import { projectSchema } from "../apps/web/src/domain";
 writeFileSync(
   "contracts/project-v1.schema.json",
   JSON.stringify(
-    zodToJsonSchema(projectSchema, "StoryTracksProject"),
+    z.toJSONSchema(projectSchema, { target: "draft-7", io: "input" }),
     null,
     2,
   ) + "\n",

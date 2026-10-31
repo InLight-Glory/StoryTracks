@@ -123,7 +123,17 @@ export function publication(p: Project, includeSuspended = false) {
   );
   if (notes.length || references.length) {
     lines.push("## Context and side notes", "");
-    for (const n of notes) lines.push(`Scope ID: ${n.ownerId}`, n.text, "");
+    for (const n of notes) {
+      if (n.canvasArea)
+        lines.push(
+          `### ${n.canvasArea === "subcontext" ? "Sub-context" : "Highlight"}${n.title ? ": " + heading(n.title) : ""}`,
+          "",
+        );
+      const owner =
+        n.canvasArea && p.nodes.find((node) => node.id === n.ownerId);
+      if (owner) lines.push(`Connected node: ${heading(nodeTitle(p, owner))}`);
+      lines.push(`Scope ID: ${n.ownerId}`, n.text, "");
+    }
     for (const r of references)
       lines.push(
         `### ${heading(r.title)}`,
@@ -157,6 +167,41 @@ export function publication(p: Project, includeSuspended = false) {
       `[Historical transcripts](${encodeURIComponent(name + "-history.md")})`,
       "",
     );
+  }
+  if (p.workbook) {
+    const prompts = p.workbook.prompts.filter((x) => x.include);
+    const world = p.workbook.world.filter((x) => x.include);
+    const questions = p.workbook.questions.filter((x) => x.include);
+    if (prompts.length || world.length || questions.length)
+      lines.push("## Project workbook", "");
+    if (prompts.length) lines.push("### Guided questions", "");
+    for (const q of prompts)
+      lines.push(
+        `#### ${heading(q.category)}`,
+        `Question: ${q.question}`,
+        q.answer,
+        "",
+      );
+    if (world.length) lines.push("### World building", "");
+    for (const entry of world)
+      lines.push(
+        `#### ${heading(entry.title || "Untitled world entry")}`,
+        `Category: ${entry.category}`,
+        entry.description,
+        "",
+      );
+    if (questions.length) lines.push("### Question studies", "");
+    for (const q of questions)
+      lines.push(
+        `#### ${heading(q.question || "Untitled question")}`,
+        `Statement: ${q.statement}`,
+        `Source: ${q.source}`,
+        `Insight: ${q.insight}`,
+        `Other possible answers: ${q.alternatives}`,
+        `Audience: ${q.audience}`,
+        `Marketing hook: ${q.hook}`,
+        "",
+      );
   }
   return {
     name,
@@ -195,7 +240,11 @@ export async function verifyAssets(p: Project) {
       throw new Error(`Attachment is damaged: ${a.filename}`);
   }
 }
-export async function publishBlob(p: Project, includeSuspended = false, supplied?: ReturnType<typeof publication>) {
+export async function publishBlob(
+  p: Project,
+  includeSuspended = false,
+  supplied?: ReturnType<typeof publication>,
+) {
   const out = supplied ?? publication(p, includeSuspended);
   await verifyAssets({ ...p, assets: out.assets });
   if (!out.history && !out.assets.length)
@@ -248,18 +297,61 @@ export async function readArchive(file: File): Promise<Project> {
   }
   const manifest = zip.file("project.json");
   if (!manifest) throw new Error("Archive must contain project.json.");
-  const data = JSON.parse(await manifest.async("string"));
+  const data = JSON.parse(
+    new TextDecoder("utf-8", { fatal: true }).decode(
+      await readEntry(manifest, 20 * 1024 * 1024),
+    ),
+  );
   if (!Array.isArray(data.assets)) throw new Error("Invalid archive.");
   for (const a of data.assets) {
     if (!/^assets\/[\w-]+\.[a-z0-9]+$/i.test(a.path))
       throw new Error("Invalid asset path.");
     const entry = zip.file(a.path);
     if (!entry) throw new Error("Missing archive attachment.");
-    a.data = await entry.async("base64");
+    a.data = toBase64(await readEntry(entry, 25 * 1024 * 1024));
   }
   const p = validateProject(data);
   await verifyAssets(p);
   return p;
+}
+function readEntry(
+  entry: JSZip.JSZipObject,
+  limit: number,
+): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    // JSZip exposes the bounded stream at runtime but omits it from JSZipObject's types.
+    const stream = (
+      entry as JSZip.JSZipObject & {
+        internalStream(type: "uint8array"): {
+          on(event: string, callback: (value: any) => void): void;
+          pause(): void;
+          resume(): void;
+        };
+      }
+    ).internalStream("uint8array");
+    stream.on("data", (chunk: Uint8Array) => {
+      size += chunk.length;
+      if (size > limit) {
+        stream.pause();
+        reject(new Error("Archive entry expands beyond its limit."));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    stream.on("error", reject);
+    stream.on("end", () => {
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      resolve(bytes);
+    });
+    stream.resume();
+  });
 }
 export function wordCount(p: Project, nodes?: StoryNode[]) {
   return (nodes || orderedNodes(p))

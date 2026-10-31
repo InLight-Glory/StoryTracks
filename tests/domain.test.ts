@@ -22,6 +22,7 @@ import {
   splitText,
   uid,
   validateProject,
+  updateTemplate,
 } from "../apps/web/src/domain";
 import {
   archiveBlob,
@@ -35,6 +36,54 @@ import {
 } from "../apps/web/src/export";
 const fixtures = JSON.parse(readFileSync("contracts/fixtures.json", "utf8"));
 const project = () => validateProject(clone(fixtures.project));
+
+test("canvas areas preserve notes through archives and publish only opted-in context", async () => {
+  const p = newProject("Canvas areas");
+  p.notes.push({
+    id: uid(),
+    ownerId: p.id,
+    canvasArea: "subcontext",
+    title: "A hidden motive",
+    text: "Context remains private",
+    include: false,
+  });
+  p.notes.push({
+    id: uid(),
+    ownerId: p.id,
+    canvasArea: "highlight",
+    title: "A recurring image",
+    text: "Keep the red door",
+    include: true,
+  });
+  const output = publication(p).markdown;
+  assert.ok(output.includes("### Highlight: A recurring image"));
+  assert.ok(output.includes("Keep the red door"));
+  assert.ok(!output.includes("Context remains private"));
+  const backup = await archiveBlob(p);
+  const restored = await readArchive(new File([backup.blob], "canvas.storytracks"));
+  assert.deepEqual(restored.notes, p.notes);
+  const copy = duplicateProject(restored);
+  assert.ok(copy.notes.every((note) => note.ownerId === copy.id));
+  assert.equal(copy.notes[0].canvasArea, "subcontext");
+});
+test("template defaults can change with locked placements but content cannot", () => {
+  const p = project(),
+    n = p.nodes.find((n) => n.templateId)!;
+  n.locked = true;
+  const t = clone(p.templates[0]);
+  t.importance = 11;
+  updateTemplate(p, t);
+  assert.equal(n.importance, 2);
+  assert.equal(p.templates[0].importance, 11);
+  t.blocks[0].text = "Must not update";
+  assert.throws(() => updateTemplate(p, t), /locked/);
+});
+test("duplication preserves authored text that happens to be a UUID", () => {
+  const p = project();
+  p.nodes[0].blocks[0].text = p.id;
+  const q = duplicateProject(p);
+  assert.equal(q.nodes[0].blocks[0].text, p.id);
+});
 test("shared text import fixtures preserve single breaks and normalize separators", () => {
   for (const fixture of fixtures.splits)
     assert.deepEqual(splitText(fixture.input), fixture.output);

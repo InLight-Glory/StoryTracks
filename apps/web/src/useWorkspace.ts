@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clone, Project, validateProject } from "./domain";
 import { saveProject } from "./storage";
-const structure = (p: Project) => JSON.stringify([p.sections,p.chapters,p.nodes].map(items=>items.map(i=>[i.id,'chapterId' in i?i.chapterId:'sectionId' in i?i.sectionId:'',i.locked,i.suspended,i.trashed])));
+const structure = (p: Project) =>
+  JSON.stringify(
+    [p.sections, p.chapters, p.nodes].map((items) =>
+      items.map((i) => [
+        i.id,
+        "chapterId" in i ? i.chapterId : "sectionId" in i ? i.sectionId : "",
+        i.locked,
+        i.suspended,
+        i.trashed,
+      ]),
+    ),
+  );
 export function useWorkspace() {
   const [project, setProject] = useState<Project | null>(null),
     ref = useRef<Project | null>(null);
@@ -15,7 +26,7 @@ export function useWorkspace() {
     savedGeneration = useRef(0),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     saving = useRef<Promise<void> | null>(null);
-  const pending = useRef<{snapshot: Project; generation: number}[]>([]);
+  const pending = useRef<{ snapshot: Project; generation: number }[]>([]);
   const flush = useCallback(async (): Promise<void> => {
     clearTimeout(timer.current);
     if (saving.current) {
@@ -94,12 +105,15 @@ export function useWorkspace() {
       generation.current++;
       setStatus("saving");
       setVersion((v) => v + 1);
-      if(structure(before)!==structure(next)) {
-        pending.current.push({snapshot:clone(next),generation:generation.current});
-        void flush().catch(()=>{});
+      if (structure(before) !== structure(next)) {
+        pending.current.push({
+          snapshot: clone(next),
+          generation: generation.current,
+        });
+        void flush().catch(() => {});
       } else schedule();
     },
-    [schedule,flush],
+    [schedule, flush],
   );
   const travel = useCallback(
     (redo = false) => {
@@ -107,19 +121,22 @@ export function useWorkspace() {
         to = redo ? history.current : future.current,
         next = from.pop();
       if (!next || !ref.current) return;
-      const before=ref.current;
+      const before = ref.current;
       to.push(before);
       ref.current = { ...next, revision: persisted.current };
       setProject(ref.current);
       generation.current++;
       setStatus("saving");
       setVersion((v) => v + 1);
-      if(structure(before)!==structure(next)) {
-        pending.current.push({snapshot:clone(ref.current),generation:generation.current});
-        void flush().catch(()=>{});
+      if (structure(before) !== structure(next)) {
+        pending.current.push({
+          snapshot: clone(ref.current),
+          generation: generation.current,
+        });
+        void flush().catch(() => {});
       } else schedule();
     },
-    [schedule,flush],
+    [schedule, flush],
   );
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {

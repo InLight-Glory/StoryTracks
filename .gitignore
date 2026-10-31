@@ -6,3 +6,4 @@ target/
 .env
 apps/php/config.php
 playwright-report/
+test-results/

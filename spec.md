@@ -109,6 +109,14 @@ Represent the book as `Project → Sections → Chapters → Node placements`.
 
 ### 5.2 Center: node canvas
 
+The canvas follows the supplied reference with three distinct areas: **Sub-context** on the left, the **Main story** in the center, and **Highlight** on the right. These are inside the canvas and separate from the collapsible outline and inspector. Use a peach accent palette with warm dark surfaces, replacing the initial olive palette.
+
+- Sub-context holds the author's thoughts and feelings about a connected node.
+- Highlight holds the author's commentary and comments on a connected node.
+- Selecting a node shows its associated notes in both areas. Identify the connected node explicitly, support navigation to it and reassignment, and protect associated notes when that node or an ancestor is locked. Retain older unlinked cards until the user assigns them.
+- Both areas autosave, support undo, and survive project duplication and portable backups with their node references preserved. Each card has a title, text, and explicit publication inclusion toggle; cards are excluded by default and included as labeled node context when opted in. Their inclusion follows the owning node's suspension/trash state.
+- Keep all three areas side by side on the desktop canvas. Smaller viewports can pan horizontally; collapsing the outer panels gives the canvas more room.
+
 - Display the narrative as one vertical stack: section heading, chapter heading, then ordered nodes from top to bottom.
 - The outline and canvas use the same canonical order. Reordering in either updates both immediately; free positioning must not silently change story order.
 - Render the whole active book with virtualization for large projects. Highlight the selected chapter and allow a chapter-only view.
@@ -356,3 +364,25 @@ Minimum entities:
 5. **Release readiness:** accessibility, large-project performance, crash recovery, deployment checks, and verified offline Windows installation.
 
 Initial release excludes cloud synchronization, real-time collaboration, automatic book writing, audio transcription, arbitrary graph branching, EPUB/PDF/typesetting, and plugin marketplaces. These may be added later without making the offline authoring workflow dependent on external services.
+
+## 15. Guided planning and question discovery
+
+### Project templates
+
+- New projects offer Blank, Hero’s journey, Science fiction, Mystery, Self-help, Fantasy, and Memoir starting points.
+- A template creates appropriate chapter headings and a workbook of original fill-in questions. It does not invent the author's answers or generate prose.
+- The left-panel **Project guide** tab groups prompts by stage, tracks answered questions, and supports adding another guide without overwriting existing answers or outline content.
+- Authors can send an answered prompt to a chosen unlocked outline chapter as an ordinary editable node. Existing reusable node templates remain a separate feature.
+
+### World building
+
+- A left-panel **World building** tab stores categorized entries for places/geography, people/cultures, history/conflict, power/institutions, technology/magic, daily life/economy, and language/beliefs.
+- Each category offers guiding questions. Authors supply entry titles and details; the material stays separate from the narrative sequence.
+
+### What was the question?
+
+- A left-panel **Questions** tab accepts statements or quotes with source/attribution and proposes questions they might answer.
+- Suggestions are explicitly hypotheses, not recovered author intent. The initial implementation uses offline language patterns and question starters, with editable results and no external AI service.
+- Each study preserves the original statement, candidate questions, selected/authored underlying question, insight/assumptions, other possible answers, intended audience, and a marketing hook.
+- Authors can use the underlying question as an editable hook and send a question study to a chosen unlocked outline chapter. No marketing copy is posted or transmitted automatically.
+- All workbook content autosaves, participates in undo/redo and portable backups, survives duplication with consistent IDs, and is independently validated by Rust and PHP. Publication is opt-in per prompt, world entry, or question study and appears in clearly labeled workbook sections.

@@ -1,4 +1,16 @@
 import ReactMarkdown from "react-markdown";
+import TemplateEditor from "./TemplateEditor";
+import VirtualStep from "./VirtualStep";
+import CanvasArea from "./CanvasArea";
+import PlanningWorkspace, {
+  PlanningNavigation,
+  planningTitles,
+} from "./PlanningWorkspace";
+import {
+  type PlanningMode,
+  projectTemplates,
+  projectFromTemplate,
+} from "./planning";
 import {
   useEffect,
   useRef,
@@ -85,6 +97,7 @@ import {
   StoryNode,
   textBlock,
   uid,
+  updateTemplate,
 } from "./domain";
 import {
   archiveBlob,
@@ -117,6 +130,7 @@ type Modal =
   | "rename"
   | "template"
   | "resource"
+  | "archiveConflict"
   | null;
 type Tab = "node" | "chapter" | "project" | "notes" | "resources" | "templates";
 type ViewState = {
@@ -250,6 +264,24 @@ export default function App() {
     [projectSearch, setProjectSearch] = useState(""),
     [sort, setSort] = useState("recent");
   const [sectionSettings, setSectionSettings] = useState("");
+  const [workspaceTab, setWorkspaceTab] = useState<PlanningMode>("outline");
+  const [planningSelection, setPlanningSelection] = useState("");
+  const [projectTemplate, setProjectTemplate] = useState("");
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [archiveConflict, setArchiveConflict] = useState<Project | null>(null);
+  const [hiddenRecent, setHiddenRecent] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("storytracks-hidden") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  useEffect(
+    () =>
+      localStorage.setItem("storytracks-hidden", JSON.stringify(hiddenRecent)),
+    [hiddenRecent],
+  );
   const [menu, setMenu] = useState(false),
     [showSuspended, setShowSuspended] = useState(false),
     [editing, setEditing] = useState(""),
@@ -302,6 +334,10 @@ export default function App() {
   }
   async function openProject(project: Project | null) {
     await w.open(project);
+    setWorkspaceTab("outline");
+    setPlanningSelection("");
+    if (project)
+      setHiddenRecent((ids) => ids.filter((id) => id !== project.id));
     setEditing("");
     setSearch("");
     setMenu(false);
@@ -319,6 +355,10 @@ export default function App() {
         right: window.innerWidth > 760,
         chapter,
         selected: project.nodes.find((n) => n.chapterId === chapter)?.id || "",
+        collapsed:
+          project.nodes.length > 200
+            ? project.chapters.filter((c) => c.id !== chapter).map((c) => c.id)
+            : [],
         ...saved,
       });
       localStorage.setItem("storytracks-last", project.id);
@@ -364,7 +404,7 @@ export default function App() {
   }, [view, p?.id]);
   useEffect(() => {
     if (canvas.current) canvas.current.scrollTop = view.scroll;
-  }, [p?.id]);
+  }, [p?.id, workspaceTab]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const input = (e.target as HTMLElement).closest(
@@ -401,15 +441,31 @@ export default function App() {
     const wheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
+        const surface = el.querySelector<HTMLElement>(".canvas-board");
+        if (!surface) return;
+        const rect = surface.getBoundingClientRect();
+        const previous = Number(surface.style.zoom) || 1;
+        const next = Math.max(
+          0.25,
+          Math.min(2, previous + (e.deltaY < 0 ? 0.05 : -0.05)),
+        );
+        const localX = (e.clientX - rect.left) / previous;
+        const localY = (e.clientY - rect.top) / previous;
+        // Adjust after the zoom changes layout, including its centered margin.
+        surface.style.zoom = String(next);
+        const updated = surface.getBoundingClientRect();
+        el.scrollLeft += updated.left + localX * next - e.clientX;
+        el.scrollTop += updated.top + localY * next - e.clientY;
         setView((v) => ({
           ...v,
-          zoom: Math.max(25, Math.min(200, v.zoom + (e.deltaY < 0 ? 5 : -5))),
+          zoom: Math.round(next * 100),
+          scroll: el.scrollTop,
         }));
       }
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
-  }, [p?.id]);
+  }, [p?.id, workspaceTab]);
   const selected = p?.nodes.find((n) => n.id === view.selected),
     chapter =
       p?.chapters.find((c) => c.id === view.chapter) ||
@@ -433,8 +489,9 @@ export default function App() {
         ? chapter?.id
         : p.id
     : undefined;
-  const note = p?.notes.find((n) => n.ownerId === scopeId);
+  const note = p?.notes.find((n) => n.ownerId === scopeId && !n.canvasArea);
   function selectNode(n: StoryNode, focus = false) {
+    setWorkspaceTab("outline");
     updateView({ selected: n.id, chapter: n.chapterId });
     setTab("node");
     if (p && effective(p, n, "suspended")) setShowSuspended(true);
@@ -442,14 +499,12 @@ export default function App() {
       updateView({ selected: n.id, chapter: n.chapterId, zoom: 100 });
       setTimeout(
         () =>
-          document
-            .getElementById("node-" + n.id)
-            ?.scrollIntoView({
-              block: "start",
-              behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-                ? "instant"
-                : "smooth",
-            }),
+          document.getElementById("node-" + n.id)?.scrollIntoView({
+            block: "start",
+            behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+              ? "instant"
+              : "smooth",
+          }),
         80,
       );
     }
@@ -458,7 +513,10 @@ export default function App() {
     if (!chapter || !p) return;
     let id = "";
     change((d) => {
-      const c = d.chapters.find((c) => c.id === chapter.id)!;
+      const targetChapter = after
+        ? d.nodes.find((n) => n.id === after)?.chapterId
+        : chapter.id;
+      const c = d.chapters.find((c) => c.id === targetChapter)!;
       assertEditable(d, c);
       const n = newNode(c.id);
       id = n.id;
@@ -486,7 +544,30 @@ export default function App() {
       fn(n, d);
     });
   }
+  function dropNode(e: React.DragEvent, target: StoryNode) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = e.dataTransfer.getData("text/storytracks-node");
+    if (!id || id === target.id) return;
+    change((d) => {
+      const moving = d.nodes.find((n) => n.id === id);
+      if (!moving) return;
+      if (moving.chapterId !== target.chapterId)
+        moveItem(d, id, 0, target.chapterId);
+      let remaining = d.nodes.length;
+      while (remaining-- > 0) {
+        const siblings = d.nodes.filter(
+            (n) => n.chapterId === target.chapterId && !n.trashed,
+          ),
+          a = siblings.findIndex((n) => n.id === id),
+          b = siblings.findIndex((n) => n.id === target.id);
+        if (a === b - 1) break;
+        moveItem(d, id, a > b ? -1 : 1);
+      }
+    });
+  }
   function startModal(type: Modal) {
+    if (type === "new") setProjectTemplate("");
     setFormName("");
     setFormText("");
     setModal(type);
@@ -496,8 +577,15 @@ export default function App() {
     if (!formName.trim()) return;
     setBusy(true);
     await run(async () => {
-      const next = await saveProject(newProject(formName, formText), 0);
+      const next = await saveProject(
+        projectFromTemplate(formName, formText, projectTemplate),
+        0,
+      );
       await openProject(next);
+      if (projectTemplate) {
+        setWorkspaceTab("guide");
+        updateView({ left: true, right: false });
+      }
       setModal(null);
       notify("Your new story starts here.");
     });
@@ -515,10 +603,9 @@ export default function App() {
       let incoming = await readArchive(file);
       const all = await refresh();
       if (all.some((x) => x.id === incoming.id)) {
-        incoming = duplicateProject(incoming);
-        notify(
-          "Imported as an independent copy because this project already exists.",
-        );
+        setArchiveConflict(incoming);
+        setModal("archiveConflict");
+        return;
       }
       incoming.revision = 0;
       const saved = await saveProject(incoming, 0);
@@ -924,6 +1011,7 @@ export default function App() {
           </div>
           <div className="project-grid">
             {projects
+              .filter((x) => showAllProjects || !hiddenRecent.includes(x.id))
               .filter((x) =>
                 x.name.toLowerCase().includes(projectSearch.toLowerCase()),
               )
@@ -979,6 +1067,17 @@ export default function App() {
                       >
                         <Trash2 size={14} />
                       </IconButton>
+                      <IconButton
+                        label={`Remove ${project.name} from recents`}
+                        onClick={() => {
+                          setHiddenRecent((ids) => [...ids, project.id]);
+                          notify(
+                            "Removed from recents. Use Show all projects to find it again.",
+                          );
+                        }}
+                      >
+                        <X size={14} />
+                      </IconButton>
                     </div>
                   </div>
                 </article>
@@ -1000,6 +1099,12 @@ export default function App() {
               ? "Projects are saved in this browser. Keep a portable backup for safekeeping."
               : "Your work stays in your private local storage."}
           </div>
+          <button
+            className="text-button"
+            onClick={() => setShowAllProjects((v) => !v)}
+          >
+            {showAllProjects ? "Show recent projects" : "Show all projects"}
+          </button>
         </main>
       ) : (
         <>
@@ -1017,7 +1122,7 @@ export default function App() {
                 <div className="panel-heading">
                   <div>
                     <span className="eyebrow">YOUR STORY, AT A GLANCE</span>
-                    <h2>Story outline</h2>
+                    <h2>{planningTitles[workspaceTab]}</h2>
                   </div>
                   <IconButton
                     label="Collapse outline"
@@ -1026,252 +1131,315 @@ export default function App() {
                     <PanelLeftClose size={17} />
                   </IconButton>
                 </div>
-                <div className="outline-summary">
-                  <BookOpen size={16} />
-                  <span>
-                    {p.sections.filter((s) => active(p, s)).length} parts
-                  </span>
-                  <span>·</span>
-                  <span>{orderedChapters(p).length} chapters</span>
-                  <span className="summary-nodes">
-                    {orderedNodes(p).length} nodes
-                  </span>
-                </div>
-                <div className="search-box outline-search">
-                  <Search size={14} />
-                  <input
-                    aria-label="Search story"
-                    placeholder="Find in your story…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  <kbd>⌕</kbd>
-                </div>
-                <div className="outline-tree">
-                  {p.sections
-                    .filter((s) => !s.trashed)
-                    .map((s, index) => (
-                      <div
-                        className={`section-group ${effective(p, s, "suspended") ? "is-suspended" : ""}`}
-                        key={s.id}
+                <div
+                  className="workspace-tabs"
+                  role="tablist"
+                  aria-label="Project workspace"
+                >
+                  {(["outline", "guide", "world", "questions"] as const).map(
+                    (mode) => (
+                      <button
+                        key={mode}
+                        role="tab"
+                        aria-selected={workspaceTab === mode}
+                        onClick={() => {
+                          setWorkspaceTab(mode);
+                          setPlanningSelection("");
+                        }}
                       >
-                        <div className="section-row">
-                          <button
-                            className="section-label"
-                            onClick={() => toggleCollapse(s.id)}
+                        {mode === "outline"
+                          ? "Outline"
+                          : mode === "guide"
+                            ? "Project guide"
+                            : mode === "world"
+                              ? "World building"
+                              : "Questions"}
+                      </button>
+                    ),
+                  )}
+                </div>
+                {workspaceTab !== "outline" ? (
+                  <PlanningNavigation
+                    project={p}
+                    mode={workspaceTab}
+                    selection={planningSelection}
+                    select={setPlanningSelection}
+                  />
+                ) : (
+                  <>
+                    <div className="outline-summary">
+                      <BookOpen size={16} />
+                      <span>
+                        {p.sections.filter((s) => active(p, s)).length} parts
+                      </span>
+                      <span>·</span>
+                      <span>{orderedChapters(p).length} chapters</span>
+                      <span className="summary-nodes">
+                        {orderedNodes(p).length} nodes
+                      </span>
+                    </div>
+                    <div className="search-box outline-search">
+                      <Search size={14} />
+                      <input
+                        aria-label="Search story"
+                        placeholder="Find in your story…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                      <kbd>⌕</kbd>
+                    </div>
+                    <div className="outline-tree">
+                      {p.sections
+                        .filter((s) => !s.trashed)
+                        .map((s, index) => (
+                          <div
+                            className={`section-group ${effective(p, s, "suspended") ? "is-suspended" : ""}`}
+                            key={s.id}
                           >
-                            {view.collapsed.includes(s.id) ? (
-                              <ChevronRight size={13} />
-                            ) : (
-                              <ChevronDown size={13} />
+                            <div className="section-row">
+                              <button
+                                className="section-label"
+                                onClick={() => toggleCollapse(s.id)}
+                              >
+                                {view.collapsed.includes(s.id) ? (
+                                  <ChevronRight size={13} />
+                                ) : (
+                                  <ChevronDown size={13} />
+                                )}
+                                <span className="part-number">
+                                  {String(index + 1).padStart(2, "0")}
+                                </span>
+                                <span>{s.title}</span>
+                                {s.locked && <LockKeyhole size={12} />}
+                              </button>
+                              <IconButton
+                                label={`Settings for part ${s.title}`}
+                                onClick={() =>
+                                  setSectionSettings(
+                                    sectionSettings === s.id ? "" : s.id,
+                                  )
+                                }
+                              >
+                                <Settings2 size={13} />
+                              </IconButton>
+                              <IconButton
+                                label={`Add chapter to ${s.title}`}
+                                onClick={() =>
+                                  change((d) => {
+                                    const section = d.sections.find(
+                                      (x) => x.id === s.id,
+                                    )!;
+                                    assertEditable(d, section);
+                                    const c = newChapter(s.id);
+                                    d.chapters.push(c);
+                                    updateView({ chapter: c.id, selected: "" });
+                                    setTab("chapter");
+                                  })
+                                }
+                              >
+                                <Plus size={14} />
+                              </IconButton>
+                            </div>
+                            {sectionSettings === s.id && (
+                              <div className="section-tools">
+                                <input
+                                  aria-label={`Rename part ${index + 1}`}
+                                  value={s.title}
+                                  disabled={effective(p, s, "locked")}
+                                  onChange={(e) =>
+                                    change((d) => {
+                                      const item = d.sections.find(
+                                        (x) => x.id === s.id,
+                                      )!;
+                                      assertEditable(d, item);
+                                      item.title = e.target.value;
+                                    })
+                                  }
+                                />
+                                {itemActions(s)}
+                              </div>
                             )}
-                            <span className="part-number">
-                              {String(index + 1).padStart(2, "0")}
-                            </span>
-                            <span>{s.title}</span>
-                            {s.locked && <LockKeyhole size={12} />}
-                          </button>
-                          <IconButton
-                            label={`Settings for part ${s.title}`}
-                            onClick={() =>
-                              setSectionSettings(
-                                sectionSettings === s.id ? "" : s.id,
-                              )
-                            }
-                          >
-                            <Settings2 size={13} />
-                          </IconButton>
-                          <IconButton
-                            label={`Add chapter to ${s.title}`}
-                            onClick={() =>
-                              change((d) => {
-                                const section = d.sections.find(
-                                  (x) => x.id === s.id,
-                                )!;
-                                assertEditable(d, section);
-                                const c = newChapter(s.id);
-                                d.chapters.push(c);
-                                updateView({ chapter: c.id, selected: "" });
-                                setTab("chapter");
-                              })
-                            }
-                          >
-                            <Plus size={14} />
-                          </IconButton>
-                        </div>
-                        {sectionSettings === s.id && (
-                          <div className="section-tools">
-                            <input
-                              aria-label={`Rename part ${index + 1}`}
-                              value={s.title}
-                              disabled={effective(p, s, "locked")}
-                              onChange={(e) =>
-                                change((d) => {
-                                  const item = d.sections.find(
-                                    (x) => x.id === s.id,
-                                  )!;
-                                  assertEditable(d, item);
-                                  item.title = e.target.value;
-                                })
-                              }
-                            />
-                            {itemActions(s)}
-                          </div>
-                        )}
-                        {!view.collapsed.includes(s.id) &&
-                          p.chapters
-                            .filter(
-                              (c) =>
-                                c.sectionId === s.id &&
-                                !effective(p, c, "trashed"),
-                            )
-                            .map((c) => (
-                              <div className="chapter-group" key={c.id}>
-                                <div
-                                  className={`chapter-row ${chapter?.id === c.id ? "current" : ""}`}
-                                >
-                                  <button
-                                    onClick={() => {
-                                      updateView({
-                                        chapter: c.id,
-                                        selected:
-                                          p.nodes.find(
-                                            (n) =>
-                                              n.chapterId === c.id &&
-                                              active(p, n),
-                                          )?.id || "",
-                                        all: false,
-                                        scroll: 0,
-                                      });
-                                      setTab("chapter");
-                                      if (canvas.current)
-                                        canvas.current.scrollTop = 0;
-                                    }}
-                                  >
-                                    <FileText size={15} />
-                                    <span className="chapter-num">
-                                      {chapterLabel(p, c).padStart(2, "0")}
-                                    </span>
-                                    <span>{c.title}</span>
-                                    {effective(p, c, "locked") && (
-                                      <LockKeyhole size={11} />
-                                    )}
-                                  </button>
-                                  <IconButton
-                                    label={`Toggle ${c.title}`}
-                                    onClick={() => toggleCollapse(c.id)}
-                                  >
-                                    {view.collapsed.includes(c.id) ? (
-                                      <ChevronRight size={12} />
-                                    ) : (
-                                      <ChevronDown size={12} />
-                                    )}
-                                  </IconButton>
-                                </div>
-                                {!view.collapsed.includes(c.id) &&
-                                  p.nodes
-                                    .filter(
-                                      (n) =>
-                                        n.chapterId === c.id &&
-                                        !effective(p, n, "trashed") &&
-                                        (!effective(p, n, "suspended") ||
-                                          showSuspended) &&
-                                        (!search ||
-                                          nodeTitle(p, n)
-                                            .toLowerCase()
-                                            .includes(search.toLowerCase())),
-                                    )
-                                    .map((n) => (
-                                      <div
-                                        className={`outline-node ${view.selected === n.id ? "selected" : ""} ${effective(p, n, "suspended") ? "is-suspended" : ""}`}
-                                        key={n.id}
-                                        draggable={!effective(p, n, "locked")}
-                                        onDragStart={(e) =>
-                                          e.dataTransfer.setData(
-                                            "text/storytracks-node",
-                                            n.id,
-                                          )
-                                        }
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={(e) => {
-                                          e.preventDefault();
-                                          const id = e.dataTransfer.getData(
-                                            "text/storytracks-node",
-                                          );
-                                          if (id && id !== n.id)
-                                            change((d) => {
-                                              const moving = d.nodes.find(
-                                                (x) => x.id === id,
-                                              )!;
-                                              if (
-                                                moving.chapterId !== n.chapterId
-                                              )
-                                                moveItem(d, id, 0, n.chapterId);
-                                              let limit = d.nodes.length;
-                                              while (limit-- > 0) {
-                                                const siblings = d.nodes.filter(
-                                                    (x) =>
-                                                      x.chapterId ===
-                                                        n.chapterId &&
-                                                      !x.trashed,
-                                                  ),
-                                                  a = siblings.findIndex(
-                                                    (x) => x.id === id,
-                                                  ),
-                                                  b = siblings.findIndex(
-                                                    (x) => x.id === n.id,
-                                                  );
-                                                if (a === b || a === b - 1)
-                                                  break;
-                                                moveItem(d, id, a > b ? -1 : 1);
-                                              }
-                                            });
+                            {!view.collapsed.includes(s.id) &&
+                              p.chapters
+                                .filter(
+                                  (c) =>
+                                    c.sectionId === s.id &&
+                                    !effective(p, c, "trashed"),
+                                )
+                                .map((c) => (
+                                  <div className="chapter-group" key={c.id}>
+                                    <div
+                                      className={`chapter-row ${chapter?.id === c.id ? "current" : ""}`}
+                                    >
+                                      <button
+                                        onClick={() => {
+                                          updateView({
+                                            chapter: c.id,
+                                            selected:
+                                              p.nodes.find(
+                                                (n) =>
+                                                  n.chapterId === c.id &&
+                                                  active(p, n),
+                                              )?.id || "",
+                                            all: false,
+                                            scroll: 0,
+                                          });
+                                          setTab("chapter");
+                                          if (canvas.current)
+                                            canvas.current.scrollTop = 0;
                                         }}
                                       >
-                                        <button onClick={() => selectNode(n)}>
-                                          <span
-                                            className={`node-dot ${n.kind}`}
-                                          />
-                                          <span>{nodeTitle(p, n)}</span>
-                                          {n.templateId && <Link2 size={10} />}
-                                        </button>
-                                        <IconButton
-                                          label={`Show ${nodeTitle(p, n)} on canvas`}
-                                          onClick={() => selectNode(n, true)}
-                                        >
-                                          <Eye size={13} />
-                                        </IconButton>
-                                      </div>
-                                    ))}
-                              </div>
-                            ))}
-                      </div>
-                    ))}
-                </div>
-                <div className="outline-bottom">
-                  <button
-                    className="text-button"
-                    onClick={() => change((d) => d.sections.push(newSection()))}
-                  >
-                    <Plus size={15} />
-                    Add a part
-                  </button>
-                  <button
-                    className="icon-button"
-                    aria-label="Open trash"
-                    onClick={() => startModal("trash")}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-                <label className="check-label small-label">
-                  <input
-                    type="checkbox"
-                    checked={showSuspended}
-                    onChange={(e) => setShowSuspended(e.target.checked)}
-                  />
-                  Show suspended material
-                </label>
+                                        <FileText size={15} />
+                                        <span className="chapter-num">
+                                          {chapterLabel(p, c).padStart(2, "0")}
+                                        </span>
+                                        <span>{c.title}</span>
+                                        {effective(p, c, "locked") && (
+                                          <LockKeyhole size={11} />
+                                        )}
+                                      </button>
+                                      <IconButton
+                                        label={`Toggle ${c.title}`}
+                                        onClick={() => toggleCollapse(c.id)}
+                                      >
+                                        {view.collapsed.includes(c.id) ? (
+                                          <ChevronRight size={12} />
+                                        ) : (
+                                          <ChevronDown size={12} />
+                                        )}
+                                      </IconButton>
+                                    </div>
+                                    {!view.collapsed.includes(c.id) &&
+                                      p.nodes
+                                        .filter(
+                                          (n) =>
+                                            n.chapterId === c.id &&
+                                            !effective(p, n, "trashed") &&
+                                            (!effective(p, n, "suspended") ||
+                                              showSuspended) &&
+                                            (!search ||
+                                              nodeTitle(p, n)
+                                                .toLowerCase()
+                                                .includes(
+                                                  search.toLowerCase(),
+                                                )),
+                                        )
+                                        .map((n) => (
+                                          <div
+                                            className={`outline-node ${view.selected === n.id ? "selected" : ""} ${effective(p, n, "suspended") ? "is-suspended" : ""}`}
+                                            key={n.id}
+                                            draggable={
+                                              !effective(p, n, "locked")
+                                            }
+                                            onDragStart={(e) =>
+                                              e.dataTransfer.setData(
+                                                "text/storytracks-node",
+                                                n.id,
+                                              )
+                                            }
+                                            onDragOver={(e) =>
+                                              e.preventDefault()
+                                            }
+                                            onDrop={(e) => {
+                                              e.preventDefault();
+                                              const id = e.dataTransfer.getData(
+                                                "text/storytracks-node",
+                                              );
+                                              if (id && id !== n.id)
+                                                change((d) => {
+                                                  const moving = d.nodes.find(
+                                                    (x) => x.id === id,
+                                                  )!;
+                                                  if (
+                                                    moving.chapterId !==
+                                                    n.chapterId
+                                                  )
+                                                    moveItem(
+                                                      d,
+                                                      id,
+                                                      0,
+                                                      n.chapterId,
+                                                    );
+                                                  let limit = d.nodes.length;
+                                                  while (limit-- > 0) {
+                                                    const siblings =
+                                                        d.nodes.filter(
+                                                          (x) =>
+                                                            x.chapterId ===
+                                                              n.chapterId &&
+                                                            !x.trashed,
+                                                        ),
+                                                      a = siblings.findIndex(
+                                                        (x) => x.id === id,
+                                                      ),
+                                                      b = siblings.findIndex(
+                                                        (x) => x.id === n.id,
+                                                      );
+                                                    if (a === b || a === b - 1)
+                                                      break;
+                                                    moveItem(
+                                                      d,
+                                                      id,
+                                                      a > b ? -1 : 1,
+                                                    );
+                                                  }
+                                                });
+                                            }}
+                                          >
+                                            <button
+                                              onClick={() => selectNode(n)}
+                                            >
+                                              <span
+                                                className={`node-dot ${n.kind}`}
+                                              />
+                                              <span>{nodeTitle(p, n)}</span>
+                                              {n.templateId && (
+                                                <Link2 size={10} />
+                                              )}
+                                            </button>
+                                            <IconButton
+                                              label={`Show ${nodeTitle(p, n)} on canvas`}
+                                              onClick={() =>
+                                                selectNode(n, true)
+                                              }
+                                            >
+                                              <Eye size={13} />
+                                            </IconButton>
+                                          </div>
+                                        ))}
+                                  </div>
+                                ))}
+                          </div>
+                        ))}
+                    </div>
+                    <div className="outline-bottom">
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          change((d) => d.sections.push(newSection()))
+                        }
+                      >
+                        <Plus size={15} />
+                        Add a part
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label="Open trash"
+                        onClick={() => startModal("trash")}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <label className="check-label small-label">
+                      <input
+                        type="checkbox"
+                        checked={showSuspended}
+                        onChange={(e) => setShowSuspended(e.target.checked)}
+                      />
+                      Show suspended material
+                    </label>
+                  </>
+                )}
                 <div className="outline-foot">
                   <span className="offline-dot" />{" "}
                   {edition === "php" ? "Private workspace" : "Offline ready"}
@@ -1302,546 +1470,663 @@ export default function App() {
               />
             )}
             <main className="canvas-panel">
-              <div className="canvas-toolbar">
-                <div className="canvas-location">
-                  {!view.left && (
-                    <IconButton
-                      label="Open outline"
-                      onClick={() => updateView({ left: true })}
-                    >
-                      <ChevronsRight size={17} />
-                    </IconButton>
-                  )}
-                  <span className="eyebrow">THE WRITING DESK</span>
-                  <span className="toolbar-divider" />
-                  <button
-                    className={view.all ? "" : "selected-filter"}
-                    onClick={() => updateView({ all: false })}
-                  >
-                    Chapter
-                  </button>
-                  <button
-                    className={view.all ? "selected-filter" : ""}
-                    onClick={() => updateView({ all: true })}
-                  >
-                    Whole book
-                  </button>
-                </div>
-                <div className="view-controls">
-                  <IconButton
-                    label="Canvas view"
-                    active={!listView}
-                    onClick={() => setListView(false)}
-                  >
-                    <LayoutGrid size={15} />
-                  </IconButton>
-                  <IconButton
-                    label="Compact view"
-                    active={listView}
-                    onClick={() => setListView(true)}
-                  >
-                    <List size={16} />
-                  </IconButton>
-                  {!view.right && (
-                    <IconButton
-                      label="Open inspector"
-                      onClick={() => updateView({ right: true })}
-                    >
-                      <ChevronsLeft size={17} />
-                    </IconButton>
-                  )}
-                </div>
-              </div>
-              <div
-                className="canvas-scroll"
-                ref={canvas}
-                onScroll={(e) => {
-                  const scroll = e.currentTarget.scrollTop;
-                  setView((v) => ({ ...v, scroll }));
-                }}
-                onPointerDown={(e) => {
-                  if (
-                    e.button === 1 ||
-                    (space.current &&
-                      !(e.target as HTMLElement).closest(
-                        "input,textarea,button",
-                      ))
-                  ) {
-                    e.preventDefault();
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    pan.current = {
-                      x: e.clientX,
-                      y: e.clientY,
-                      sx: e.currentTarget.scrollLeft,
-                      sy: e.currentTarget.scrollTop,
-                    };
-                  }
-                }}
-                onPointerMove={(e) => {
-                  if (pan.current) {
-                    e.currentTarget.scrollLeft =
-                      pan.current.sx - (e.clientX - pan.current.x);
-                    e.currentTarget.scrollTop =
-                      pan.current.sy - (e.clientY - pan.current.y);
-                  }
-                }}
-                onPointerUp={() => (pan.current = null)}
-              >
-                <div
-                  className={`story-canvas ${listView ? "compact" : ""}`}
-                  style={{ zoom: view.zoom / 100 } as CSSProperties}
-                >
-                  <div className="chapter-intro">
-                    <div className="chapter-kicker">
-                      <span />{" "}
-                      {view.all
-                        ? "THE COMPLETE STORY"
-                        : `CHAPTER ${chapter ? chapterLabel(p, chapter).padStart(2, "0") : "01"}`}{" "}
-                      <span />
+              {workspaceTab !== "outline" ? (
+                <PlanningWorkspace
+                  key={workspaceTab}
+                  project={p}
+                  mode={workspaceTab}
+                  selection={planningSelection}
+                  select={setPlanningSelection}
+                  change={change}
+                  chapterId={chapter?.id || ""}
+                  openOutline={() => setWorkspaceTab("outline")}
+                  openNavigation={() => updateView({ left: true })}
+                />
+              ) : (
+                <>
+                  <div className="canvas-toolbar">
+                    <div className="canvas-location">
+                      {!view.left && (
+                        <IconButton
+                          label="Open outline"
+                          onClick={() => updateView({ left: true })}
+                        >
+                          <ChevronsRight size={17} />
+                        </IconButton>
+                      )}
+                      <span className="eyebrow">THE WRITING DESK</span>
+                      <span className="toolbar-divider" />
+                      <button
+                        className={view.all ? "" : "selected-filter"}
+                        onClick={() => updateView({ all: false })}
+                      >
+                        Chapter
+                      </button>
+                      <button
+                        className={view.all ? "selected-filter" : ""}
+                        onClick={() => updateView({ all: true })}
+                      >
+                        Whole book
+                      </button>
                     </div>
-                    <h1>
-                      {view.all ? p.name : chapter?.title || "A new beginning"}
-                    </h1>
-                    <p>
-                      {view.all
-                        ? p.description
-                        : chapter?.metadata.summary ||
-                          "Every scene is a step. See where the story takes you."}
-                    </p>
-                    <div className="chapter-details">
-                      <span>
-                        <Layers size={12} />
-                        {nodes.length} nodes
-                      </span>
-                      <span>·</span>
-                      <span>{wordCount(p, nodes).toLocaleString()} words</span>
-                      <span>·</span>
-                      <span className="mood-dot" />
-                      {chapter
-                        ? effectiveMetadata(p, chapter).pacing || "Your pace"
-                        : "Your story"}
+                    <div className="view-controls">
+                      <IconButton
+                        label="Canvas view"
+                        active={!listView}
+                        onClick={() => setListView(false)}
+                      >
+                        <LayoutGrid size={15} />
+                      </IconButton>
+                      <IconButton
+                        label="Compact view"
+                        active={listView}
+                        onClick={() => setListView(true)}
+                      >
+                        <List size={16} />
+                      </IconButton>
+                      {!view.right && (
+                        <IconButton
+                          label="Open inspector"
+                          onClick={() => updateView({ right: true })}
+                        >
+                          <ChevronsLeft size={17} />
+                        </IconButton>
+                      )}
                     </div>
                   </div>
-                  <div className="track">
-                    {nodes.map((n, index) => {
-                      const KindIcon = icons[n.kind],
-                        isSelected = view.selected === n.id,
-                        blocks = resolvedBlocks(p, n),
-                        isLocked = effective(p, n, "locked");
-                      return (
-                        <div
-                          className={`track-step ${isSelected ? "is-selected" : ""}`}
-                          key={n.id}
-                          style={
-                            {
-                              contentVisibility:
-                                editing === n.id ? "visible" : "auto",
-                              containIntrinsicSize: listView
-                                ? "auto 170px"
-                                : "auto 280px",
-                            } as CSSProperties
-                          }
-                        >
-                          <div className="track-marker">
-                            <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div
+                    className="canvas-scroll"
+                    ref={canvas}
+                    onScroll={(e) => {
+                      const scroll = e.currentTarget.scrollTop;
+                      setView((v) => ({ ...v, scroll }));
+                    }}
+                    onPointerDown={(e) => {
+                      if (
+                        e.button === 1 ||
+                        (space.current &&
+                          !(e.target as HTMLElement).closest(
+                            "input,textarea,button",
+                          ))
+                      ) {
+                        e.preventDefault();
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        pan.current = {
+                          x: e.clientX,
+                          y: e.clientY,
+                          sx: e.currentTarget.scrollLeft,
+                          sy: e.currentTarget.scrollTop,
+                        };
+                      }
+                    }}
+                    onPointerMove={(e) => {
+                      if (pan.current) {
+                        e.currentTarget.scrollLeft =
+                          pan.current.sx - (e.clientX - pan.current.x);
+                        e.currentTarget.scrollTop =
+                          pan.current.sy - (e.clientY - pan.current.y);
+                      }
+                    }}
+                    onPointerUp={() => (pan.current = null)}
+                  >
+                    <div
+                      className="canvas-board"
+                      style={{ zoom: view.zoom / 100 } as CSSProperties}
+                    >
+                      <CanvasArea
+                        project={p}
+                        area="subcontext"
+                        selected={selected}
+                        selectNode={selectNode}
+                        change={change}
+                      />
+                      <div
+                        className={`story-canvas ${listView ? "compact" : ""}`}
+                      >
+                        <div className="main-area-label eyebrow">
+                          02 / MAIN STORY
+                        </div>
+                        <div className="chapter-intro">
+                          <div className="chapter-kicker">
+                            <span />{" "}
+                            {view.all
+                              ? "THE COMPLETE STORY"
+                              : `CHAPTER ${chapter ? chapterLabel(p, chapter).padStart(2, "0") : "01"}`}{" "}
+                            <span />
                           </div>
-                          {view.all &&
-                            (index === 0 ||
-                              nodes[index - 1].chapterId !== n.chapterId) && (
-                              <div className="track-chapter-label">
-                                Chapter{" "}
-                                {chapterLabel(
-                                  p,
-                                  p.chapters.find((c) => c.id === n.chapterId)!,
-                                )}{" "}
-                                ·{" "}
-                                {
-                                  p.chapters.find((c) => c.id === n.chapterId)
-                                    ?.title
-                                }
-                              </div>
-                            )}
-                          <article
-                            id={"node-" + n.id}
-                            className={`node-card ${isSelected ? "selected" : ""} ${effective(p, n, "suspended") ? "is-suspended" : ""}`}
-                            onClick={() => selectNode(n)}
-                          >
-                            <header className="node-card-header">
-                              <div className={`node-type ${n.kind}`}>
-                                <KindIcon size={12} />
-                                {n.kind === "turn"
-                                  ? "TURNING POINT"
-                                  : n.kind.toUpperCase()}
-                                {n.templateId && <Link2 size={12} />}
-                              </div>
-                              <div className="node-card-actions">
-                                {isLocked && <LockKeyhole size={12} />}
-                                <span
-                                  className="grip"
-                                  draggable={!isLocked}
-                                  aria-label="Drag node to reorder"
-                                  title="Drag to reorder in the outline"
-                                  onDragStart={(e) =>
-                                    e.dataTransfer.setData(
-                                      "text/storytracks-node",
-                                      n.id,
-                                    )
-                                  }
-                                >
-                                  <GripVertical size={15} />
-                                </span>
-                                <IconButton
-                                  label={`Settings for ${nodeTitle(p, n)}`}
-                                  onClick={() => {
-                                    selectNode(n);
-                                    setTab("node");
-                                    updateView({ right: true });
-                                  }}
-                                >
-                                  <Settings2 size={14} />
-                                </IconButton>
-                              </div>
-                            </header>
-                            {editing === n.id && !isLocked && !n.templateId ? (
-                              <div className="node-edit">
-                                <input
-                                  className="node-title-input"
-                                  aria-label="Node title"
-                                  placeholder="Give this moment a name…"
-                                  value={n.title}
-                                  onChange={(e) =>
-                                    editNode(
-                                      n.id,
-                                      (x) => (x.title = e.target.value),
-                                    )
-                                  }
-                                  autoFocus
-                                />
-                                {blocks.map((b, bi) => (
-                                  <div className="block-editor" key={b.id}>
-                                    {b.type === "text" ? (
-                                      <textarea
-                                        aria-label={`Content block ${bi + 1}`}
-                                        placeholder="What happens in this moment?"
-                                        value={b.text}
-                                        onChange={(e) =>
-                                          editNode(
-                                            n.id,
-                                            (x) =>
-                                              (x.blocks.find(
-                                                (y) => y.id === b.id,
-                                              )!.text = e.target.value),
+                          <h1>
+                            {view.all
+                              ? p.name
+                              : chapter?.title || "A new beginning"}
+                          </h1>
+                          <p>
+                            {view.all
+                              ? p.description
+                              : chapter?.metadata.summary ||
+                                "Every scene is a step. See where the story takes you."}
+                          </p>
+                          <div className="chapter-details">
+                            <span>
+                              <Layers size={12} />
+                              {nodes.length} nodes
+                            </span>
+                            <span>·</span>
+                            <span>
+                              {wordCount(p, nodes).toLocaleString()} words
+                            </span>
+                            <span>·</span>
+                            <span className="mood-dot" />
+                            {chapter
+                              ? effectiveMetadata(p, chapter).pacing ||
+                                "Your pace"
+                              : "Your story"}
+                          </div>
+                        </div>
+                        <div className="track">
+                          {nodes.map((n, index) => {
+                            const KindIcon = icons[n.kind],
+                              isSelected = view.selected === n.id,
+                              blocks = resolvedBlocks(p, n),
+                              isLocked = effective(p, n, "locked");
+                            return (
+                              <VirtualStep
+                                id={"node-" + n.id}
+                                className={`track-step ${isSelected ? "is-selected" : ""}`}
+                                key={n.id}
+                                estimatedHeight={listView ? 170 : 280}
+                                initial={index < 5}
+                                pinned={isSelected || editing === n.id}
+                              >
+                                {() => (
+                                  <>
+                                    <div className="track-marker">
+                                      <span>
+                                        {String(index + 1).padStart(2, "0")}
+                                      </span>
+                                    </div>
+                                    {view.all &&
+                                      (index === 0 ||
+                                        nodes[index - 1].chapterId !==
+                                          n.chapterId) && (
+                                        <div className="track-chapter-label">
+                                          Chapter{" "}
+                                          {chapterLabel(
+                                            p,
+                                            p.chapters.find(
+                                              (c) => c.id === n.chapterId,
+                                            )!,
+                                          )}{" "}
+                                          ·{" "}
+                                          {
+                                            p.chapters.find(
+                                              (c) => c.id === n.chapterId,
+                                            )?.title
+                                          }
+                                        </div>
+                                      )}
+                                    <article
+                                      className={`node-card ${isSelected ? "selected" : ""} ${effective(p, n, "suspended") ? "is-suspended" : ""}`}
+                                      onClick={() => selectNode(n)}
+                                      onDragOver={(e) => {
+                                        if (
+                                          e.dataTransfer.types.includes(
+                                            "text/storytracks-node",
                                           )
-                                        }
-                                        onPaste={(e) => {
-                                          const file = Array.from(
-                                            e.clipboardData.files,
-                                          ).find((f) =>
-                                            f.type.startsWith("image/"),
-                                          );
-                                          if (file) {
-                                            e.preventDefault();
-                                            void run(() => addMedia(file));
-                                          }
-                                        }}
-                                      />
-                                    ) : (
-                                      <>
-                                        <MediaBlock p={p} b={b} />
-                                        <input
-                                          aria-label="Media caption"
-                                          placeholder="Caption"
-                                          value={b.caption}
-                                          onChange={(e) =>
-                                            editNode(
-                                              n.id,
-                                              (x) =>
-                                                (x.blocks.find(
-                                                  (y) => y.id === b.id,
-                                                )!.caption = e.target.value),
-                                            )
-                                          }
-                                        />
-                                        {b.type === "image" && (
+                                        )
+                                          e.preventDefault();
+                                      }}
+                                      onDrop={(e) => dropNode(e, n)}
+                                    >
+                                      <header className="node-card-header">
+                                        <div className={`node-type ${n.kind}`}>
+                                          <KindIcon size={12} />
+                                          {n.kind === "turn"
+                                            ? "TURNING POINT"
+                                            : n.kind.toUpperCase()}
+                                          {n.templateId && <Link2 size={12} />}
+                                        </div>
+                                        <div className="node-card-actions">
+                                          {isLocked && (
+                                            <LockKeyhole size={12} />
+                                          )}
+                                          <span
+                                            className="grip"
+                                            draggable={!isLocked}
+                                            aria-label="Drag node to reorder"
+                                            title="Drag onto a node to move before it"
+                                            onDragStart={(e) =>
+                                              e.dataTransfer.setData(
+                                                "text/storytracks-node",
+                                                n.id,
+                                              )
+                                            }
+                                          >
+                                            <GripVertical size={15} />
+                                          </span>
+                                          <IconButton
+                                            label={`Settings for ${nodeTitle(p, n)}`}
+                                            onClick={() => {
+                                              selectNode(n);
+                                              setTab("node");
+                                              updateView({ right: true });
+                                            }}
+                                          >
+                                            <Settings2 size={14} />
+                                          </IconButton>
+                                        </div>
+                                      </header>
+                                      {editing === n.id &&
+                                      !isLocked &&
+                                      !n.templateId ? (
+                                        <div className="node-edit">
                                           <input
-                                            aria-label="Alternative text"
-                                            placeholder="Describe the image"
-                                            value={b.alt}
+                                            className="node-title-input"
+                                            aria-label="Node title"
+                                            placeholder="Give this moment a name…"
+                                            value={n.title}
                                             onChange={(e) =>
                                               editNode(
                                                 n.id,
                                                 (x) =>
-                                                  (x.blocks.find(
-                                                    (y) => y.id === b.id,
-                                                  )!.alt = e.target.value),
+                                                  (x.title = e.target.value),
                                               )
                                             }
+                                            autoFocus
                                           />
-                                        )}
-                                      </>
-                                    )}
-                                    <div className="block-tools">
-                                      <IconButton
-                                        label="Move block up"
-                                        disabled={bi === 0}
-                                        onClick={() =>
-                                          editNode(n.id, (x) => {
-                                            [x.blocks[bi - 1], x.blocks[bi]] = [
-                                              x.blocks[bi],
-                                              x.blocks[bi - 1],
-                                            ];
-                                          })
-                                        }
-                                      >
-                                        <ArrowUp size={12} />
-                                      </IconButton>
-                                      <IconButton
-                                        label="Move block down"
-                                        disabled={bi === blocks.length - 1}
-                                        onClick={() =>
-                                          editNode(n.id, (x) => {
-                                            [x.blocks[bi + 1], x.blocks[bi]] = [
-                                              x.blocks[bi],
-                                              x.blocks[bi + 1],
-                                            ];
-                                          })
-                                        }
-                                      >
-                                        <ArrowDown size={12} />
-                                      </IconButton>
-                                      <IconButton
-                                        label="Remove content block"
-                                        onClick={() =>
-                                          editNode(
-                                            n.id,
-                                            (x) =>
-                                              (x.blocks = x.blocks.filter(
-                                                (y) => y.id !== b.id,
-                                              )),
-                                          )
-                                        }
-                                      >
-                                        <X size={12} />
-                                      </IconButton>
-                                    </div>
-                                  </div>
-                                ))}
-                                <div className="edit-toolbar">
-                                  <button
-                                    className="text-button"
-                                    onClick={() =>
-                                      editNode(n.id, (x) =>
-                                        x.blocks.push(textBlock()),
-                                      )
-                                    }
-                                  >
-                                    <Plus size={13} />
-                                    Text
-                                  </button>
-                                  <button
-                                    className="text-button"
-                                    onClick={() => mediaInput.current?.click()}
-                                  >
-                                    <ImagePlus size={13} />
-                                    Media
-                                  </button>
-                                  <button
-                                    className="primary tiny"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditing("");
-                                    }}
-                                  >
-                                    Done
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                className="node-body"
-                                onDoubleClick={() => {
-                                  if (!isLocked && !n.templateId)
-                                    setEditing(n.id);
-                                }}
-                              >
-                                <button
-                                  className="node-title-button"
-                                  onClick={() => {
-                                    if (!isLocked && !n.templateId)
-                                      setEditing(n.id);
-                                  }}
-                                >
-                                  <h2>{nodeTitle(p, n)}</h2>
-                                </button>
-                                {blocks.length ? (
-                                  blocks.map((b) =>
-                                    b.type === "text" ? (
-                                      <div className="prose" key={b.id}>
-                                        {b.text ? (
-                                          <ReactMarkdown
-                                            skipHtml
-                                            components={{
-                                              img: () => null,
-                                              a: ({ children }) => (
-                                                <span>{children}</span>
-                                              ),
+                                          {blocks.map((b, bi) => (
+                                            <div
+                                              className="block-editor"
+                                              key={b.id}
+                                            >
+                                              {b.type === "text" ? (
+                                                <textarea
+                                                  aria-label={`Content block ${bi + 1}`}
+                                                  placeholder="What happens in this moment?"
+                                                  value={b.text}
+                                                  onChange={(e) =>
+                                                    editNode(
+                                                      n.id,
+                                                      (x) =>
+                                                        (x.blocks.find(
+                                                          (y) => y.id === b.id,
+                                                        )!.text =
+                                                          e.target.value),
+                                                    )
+                                                  }
+                                                  onPaste={(e) => {
+                                                    const file = Array.from(
+                                                      e.clipboardData.files,
+                                                    ).find((f) =>
+                                                      f.type.startsWith(
+                                                        "image/",
+                                                      ),
+                                                    );
+                                                    if (file) {
+                                                      e.preventDefault();
+                                                      void run(() =>
+                                                        addMedia(file),
+                                                      );
+                                                    }
+                                                  }}
+                                                />
+                                              ) : (
+                                                <>
+                                                  <MediaBlock p={p} b={b} />
+                                                  <input
+                                                    aria-label="Media caption"
+                                                    placeholder="Caption"
+                                                    value={b.caption}
+                                                    onChange={(e) =>
+                                                      editNode(
+                                                        n.id,
+                                                        (x) =>
+                                                          (x.blocks.find(
+                                                            (y) =>
+                                                              y.id === b.id,
+                                                          )!.caption =
+                                                            e.target.value),
+                                                      )
+                                                    }
+                                                  />
+                                                  {b.type === "image" && (
+                                                    <input
+                                                      aria-label="Alternative text"
+                                                      placeholder="Describe the image"
+                                                      value={b.alt}
+                                                      onChange={(e) =>
+                                                        editNode(
+                                                          n.id,
+                                                          (x) =>
+                                                            (x.blocks.find(
+                                                              (y) =>
+                                                                y.id === b.id,
+                                                            )!.alt =
+                                                              e.target.value),
+                                                        )
+                                                      }
+                                                    />
+                                                  )}
+                                                  {b.type === "audio" && (
+                                                    <textarea
+                                                      aria-label="Audio transcript"
+                                                      placeholder="Optional transcript"
+                                                      value={b.text}
+                                                      onChange={(e) =>
+                                                        editNode(n.id, (x) => {
+                                                          x.blocks.find(
+                                                            (y) =>
+                                                              y.id === b.id,
+                                                          )!.text =
+                                                            e.target.value;
+                                                        })
+                                                      }
+                                                    />
+                                                  )}
+                                                </>
+                                              )}
+                                              <div className="block-tools">
+                                                <IconButton
+                                                  label="Move block up"
+                                                  disabled={bi === 0}
+                                                  onClick={() =>
+                                                    editNode(n.id, (x) => {
+                                                      [
+                                                        x.blocks[bi - 1],
+                                                        x.blocks[bi],
+                                                      ] = [
+                                                        x.blocks[bi],
+                                                        x.blocks[bi - 1],
+                                                      ];
+                                                    })
+                                                  }
+                                                >
+                                                  <ArrowUp size={12} />
+                                                </IconButton>
+                                                <IconButton
+                                                  label="Move block down"
+                                                  disabled={
+                                                    bi === blocks.length - 1
+                                                  }
+                                                  onClick={() =>
+                                                    editNode(n.id, (x) => {
+                                                      [
+                                                        x.blocks[bi + 1],
+                                                        x.blocks[bi],
+                                                      ] = [
+                                                        x.blocks[bi],
+                                                        x.blocks[bi + 1],
+                                                      ];
+                                                    })
+                                                  }
+                                                >
+                                                  <ArrowDown size={12} />
+                                                </IconButton>
+                                                <IconButton
+                                                  label="Remove content block"
+                                                  onClick={() =>
+                                                    editNode(
+                                                      n.id,
+                                                      (x) =>
+                                                        (x.blocks =
+                                                          x.blocks.filter(
+                                                            (y) =>
+                                                              y.id !== b.id,
+                                                          )),
+                                                    )
+                                                  }
+                                                >
+                                                  <X size={12} />
+                                                </IconButton>
+                                              </div>
+                                            </div>
+                                          ))}
+                                          <div className="edit-toolbar">
+                                            <button
+                                              className="text-button"
+                                              onClick={() =>
+                                                editNode(n.id, (x) =>
+                                                  x.blocks.push(textBlock()),
+                                                )
+                                              }
+                                            >
+                                              <Plus size={13} />
+                                              Text
+                                            </button>
+                                            <button
+                                              className="text-button"
+                                              onClick={() =>
+                                                mediaInput.current?.click()
+                                              }
+                                            >
+                                              <ImagePlus size={13} />
+                                              Media
+                                            </button>
+                                            <button
+                                              className="primary tiny"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditing("");
+                                              }}
+                                            >
+                                              Done
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div
+                                          className="node-body"
+                                          onDoubleClick={() => {
+                                            if (!isLocked && !n.templateId)
+                                              setEditing(n.id);
+                                          }}
+                                        >
+                                          <button
+                                            className="node-title-button"
+                                            onClick={() => {
+                                              if (!isLocked && !n.templateId)
+                                                setEditing(n.id);
                                             }}
                                           >
-                                            {b.text}
-                                          </ReactMarkdown>
-                                        ) : (
-                                          <p className="placeholder">
-                                            Double-click to begin writing…
-                                          </p>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <MediaBlock p={p} b={b} key={b.id} />
-                                    ),
-                                  )
-                                ) : (
-                                  <p className="placeholder">
-                                    Add a thought, a scene, a possibility.
-                                  </p>
+                                            <h2>{nodeTitle(p, n)}</h2>
+                                          </button>
+                                          {blocks.length ? (
+                                            blocks.map((b) =>
+                                              b.type === "text" ? (
+                                                <div
+                                                  className="prose"
+                                                  key={b.id}
+                                                >
+                                                  {b.text ? (
+                                                    <ReactMarkdown
+                                                      skipHtml
+                                                      components={{
+                                                        img: () => null,
+                                                        a: ({ children }) => (
+                                                          <span>
+                                                            {children}
+                                                          </span>
+                                                        ),
+                                                      }}
+                                                    >
+                                                      {b.text}
+                                                    </ReactMarkdown>
+                                                  ) : (
+                                                    <p className="placeholder">
+                                                      Double-click to begin
+                                                      writing…
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <MediaBlock
+                                                  p={p}
+                                                  b={b}
+                                                  key={b.id}
+                                                />
+                                              ),
+                                            )
+                                          ) : (
+                                            <p className="placeholder">
+                                              Add a thought, a scene, a
+                                              possibility.
+                                            </p>
+                                          )}
+                                        </div>
+                                      )}
+                                      <footer className="node-footer">
+                                        <div>
+                                          <span
+                                            className="weight-dots"
+                                            title={`Importance ${(n.importance / 2).toFixed(1)} of 5.5`}
+                                          >
+                                            {[2, 4, 6, 8, 10].map((v) => (
+                                              <i
+                                                className={
+                                                  n.importance >= v
+                                                    ? "filled"
+                                                    : ""
+                                                }
+                                                key={v}
+                                              />
+                                            ))}
+                                          </span>
+                                          <span>
+                                            Importance{" "}
+                                            <b>
+                                              {(n.importance / 2).toFixed(1)}
+                                            </b>
+                                          </span>
+                                          <span className="footer-separator" />
+                                          <span>
+                                            Liberty{" "}
+                                            <b>{(n.liberty / 2).toFixed(1)}</b>
+                                          </span>
+                                        </div>
+                                        <span className="transition-label">
+                                          {sharpness(n.ending)} exit{" "}
+                                          <ArrowRight size={12} />
+                                        </span>
+                                      </footer>
+                                    </article>
+                                    <button
+                                      className="insert-node"
+                                      aria-label={`Insert node after ${nodeTitle(p, n)}`}
+                                      onClick={() => addNode(n.id)}
+                                    >
+                                      <Plus size={13} />
+                                    </button>
+                                  </>
                                 )}
-                              </div>
-                            )}
-                            <footer className="node-footer">
-                              <div>
-                                <span
-                                  className="weight-dots"
-                                  title={`Importance ${(n.importance / 2).toFixed(1)} of 5.5`}
-                                >
-                                  {[2, 4, 6, 8, 10].map((v) => (
-                                    <i
-                                      className={
-                                        n.importance >= v ? "filled" : ""
-                                      }
-                                      key={v}
-                                    />
-                                  ))}
-                                </span>
-                                <span>
-                                  Importance{" "}
-                                  <b>{(n.importance / 2).toFixed(1)}</b>
-                                </span>
-                                <span className="footer-separator" />
-                                <span>
-                                  Liberty <b>{(n.liberty / 2).toFixed(1)}</b>
-                                </span>
-                              </div>
-                              <span className="transition-label">
-                                {sharpness(n.ending)} exit{" "}
-                                <ArrowRight size={12} />
+                              </VirtualStep>
+                            );
+                          })}
+                          {!nodes.length && (
+                            <div className="empty-canvas">
+                              <span className="empty-icon">
+                                <FileText size={30} />
                               </span>
-                            </footer>
-                          </article>
-                          <button
-                            className="insert-node"
-                            aria-label={`Insert node after ${nodeTitle(p, n)}`}
-                            onClick={() => addNode(n.id)}
-                          >
-                            <Plus size={13} />
-                          </button>
+                              <h2>
+                                {search
+                                  ? "No matching moments"
+                                  : "A blank page, a thousand possibilities."}
+                              </h2>
+                              <p>
+                                {search
+                                  ? "Try a different word or clear your search."
+                                  : "Start with a scene, a feeling, or a single line."}
+                              </p>
+                              {search ? (
+                                <button
+                                  className="button"
+                                  onClick={() => setSearch("")}
+                                >
+                                  Clear search
+                                </button>
+                              ) : (
+                                <button
+                                  className="primary"
+                                  disabled={!chapter}
+                                  onClick={() => addNode()}
+                                >
+                                  <Plus size={16} />
+                                  Create your first node
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {!!nodes.length && (
+                            <button
+                              className="add-node-bottom"
+                              onClick={() => addNode()}
+                            >
+                              <Plus size={17} />
+                              <span>Add the next moment</span>
+                              <kbd>+</kbd>
+                            </button>
+                          )}
                         </div>
-                      );
-                    })}
-                    {!nodes.length && (
-                      <div className="empty-canvas">
-                        <span className="empty-icon">
-                          <FileText size={30} />
-                        </span>
-                        <h2>
-                          {search
-                            ? "No matching moments"
-                            : "A blank page, a thousand possibilities."}
-                        </h2>
-                        <p>
-                          {search
-                            ? "Try a different word or clear your search."
-                            : "Start with a scene, a feeling, or a single line."}
-                        </p>
-                        {search ? (
-                          <button
-                            className="button"
-                            onClick={() => setSearch("")}
-                          >
-                            Clear search
-                          </button>
-                        ) : (
-                          <button
-                            className="primary"
-                            disabled={!chapter}
-                            onClick={() => addNode()}
-                          >
-                            <Plus size={16} />
-                            Create your first node
-                          </button>
-                        )}
+                        <div className="canvas-end">
+                          <span /> A STORY TAKES SHAPE, ONE MOMENT AT A TIME{" "}
+                          <span />
+                        </div>
                       </div>
-                    )}
-                    {!!nodes.length && (
-                      <button
-                        className="add-node-bottom"
-                        onClick={() => addNode()}
+                      <CanvasArea
+                        project={p}
+                        area="highlight"
+                        selected={selected}
+                        selectNode={selectNode}
+                        change={change}
+                      />
+                    </div>
+                  </div>
+                  <div className="canvas-bottom">
+                    <span>
+                      <span className="offline-dot" />
+                      {view.all
+                        ? "Whole book"
+                        : `Chapter ${chapter ? chapterLabel(p, chapter) : "—"}`}
+                      <span className="bottom-divider">/</span>
+                      {selected ? "1 node selected" : "No selection"}
+                    </span>
+                    <div className="zoom-controls">
+                      <IconButton
+                        label="Zoom out"
+                        onClick={() =>
+                          updateView({ zoom: Math.max(25, view.zoom - 10) })
+                        }
                       >
-                        <Plus size={17} />
-                        <span>Add the next moment</span>
-                        <kbd>+</kbd>
+                        <ZoomOut size={15} />
+                      </IconButton>
+                      <button
+                        onClick={() => updateView({ zoom: 100 })}
+                        title="Reset zoom"
+                      >
+                        {view.zoom}%
                       </button>
-                    )}
+                      <IconButton
+                        label="Zoom in"
+                        onClick={() =>
+                          updateView({ zoom: Math.min(200, view.zoom + 10) })
+                        }
+                      >
+                        <ZoomIn size={15} />
+                      </IconButton>
+                      <span className="toolbar-divider" />
+                      <IconButton
+                        label="Fit selected node"
+                        onClick={() => {
+                          if (selected) selectNode(selected, true);
+                          else updateView({ zoom: 100 });
+                        }}
+                      >
+                        <Maximize2 size={14} />
+                      </IconButton>
+                    </div>
                   </div>
-                  <div className="canvas-end">
-                    <span /> A STORY TAKES SHAPE, ONE MOMENT AT A TIME <span />
-                  </div>
-                </div>
-              </div>
-              <div className="canvas-bottom">
-                <span>
-                  <span className="offline-dot" />
-                  {view.all
-                    ? "Whole book"
-                    : `Chapter ${chapter ? chapterLabel(p, chapter) : "—"}`}
-                  <span className="bottom-divider">/</span>
-                  {selected ? "1 node selected" : "No selection"}
-                </span>
-                <div className="zoom-controls">
-                  <IconButton
-                    label="Zoom out"
-                    onClick={() =>
-                      updateView({ zoom: Math.max(25, view.zoom - 10) })
-                    }
-                  >
-                    <ZoomOut size={15} />
-                  </IconButton>
-                  <button
-                    onClick={() => updateView({ zoom: 100 })}
-                    title="Reset zoom"
-                  >
-                    {view.zoom}%
-                  </button>
-                  <IconButton
-                    label="Zoom in"
-                    onClick={() =>
-                      updateView({ zoom: Math.min(200, view.zoom + 10) })
-                    }
-                  >
-                    <ZoomIn size={15} />
-                  </IconButton>
-                  <span className="toolbar-divider" />
-                  <IconButton
-                    label="Fit selected node"
-                    onClick={() => {
-                      if (selected) selectNode(selected, true);
-                      else updateView({ zoom: 100 });
-                    }}
-                  >
-                    <Maximize2 size={14} />
-                  </IconButton>
-                </div>
-              </div>
+                </>
+              )}
             </main>
-            {view.right && (
+            {view.right && workspaceTab === "outline" && (
               <div
                 className="resize-handle"
                 role="separator"
@@ -1863,7 +2148,7 @@ export default function App() {
                 }}
               />
             )}
-            {view.right && (
+            {view.right && workspaceTab === "outline" && (
               <aside className="inspector">
                 <div className="panel-heading">
                   <div>
@@ -1938,6 +2223,14 @@ export default function App() {
                             <Link2 size={15} />
                             Linked template
                             <button
+                              onClick={() => {
+                                setTemplateEdit(selected.templateId!);
+                                setModal("template");
+                              }}
+                            >
+                              Edit template
+                            </button>
+                            <button
                               onClick={() =>
                                 change((d) =>
                                   detach(
@@ -1976,7 +2269,19 @@ export default function App() {
                           <button
                             onClick={() =>
                               editNode(selected.id, (n) =>
-                                Object.assign(n, defaults),
+                                Object.assign(
+                                  n,
+                                  Object.fromEntries(
+                                    Object.keys(defaults).map((k) => [
+                                      k,
+                                      (p.templates.find(
+                                        (t) => t.id === n.templateId,
+                                      ) ?? defaults)[
+                                        k as keyof typeof defaults
+                                      ],
+                                    ]),
+                                  ),
+                                ),
                               )
                             }
                             disabled={locked}
@@ -2387,7 +2692,7 @@ export default function App() {
                             const owner = getItem(d, scopeId);
                             if (owner) assertEditable(d, owner);
                             const existing = d.notes.find(
-                              (n) => n.ownerId === scopeId,
+                              (n) => n.ownerId === scopeId && !n.canvasArea,
                             );
                             if (existing) existing.text = e.target.value;
                             else
@@ -2429,95 +2734,140 @@ export default function App() {
                         Recurring words and moments. Each placement has its own
                         weight.
                       </p>
-                      {p.templates.map((t) => (
-                        <div className="resource-card" key={t.id}>
-                          <div>
-                            <Copy size={16} />
-                            <h4>{t.name}</h4>
-                          </div>
-                          <p>
-                            {t.blocks
-                              .filter((b) => b.type === "text")
-                              .map((b) => b.text)
-                              .join("\n")}
-                          </p>
-                          <small>
-                            {
-                              p.nodes.filter((n) => n.templateId === t.id)
-                                .length
-                            }{" "}
-                            linked placements
-                          </small>
-                          <div className="resource-actions">
-                            <button
-                              className="text-button"
-                              disabled={!chapter}
-                              onClick={() => {
-                                let id = "";
-                                change((d) => {
-                                  const c = d.chapters.find(
-                                    (c) => c.id === chapter!.id,
-                                  )!;
-                                  assertEditable(d, c);
-                                  const n = {
-                                    ...newNode(c.id),
-                                    blocks: [],
-                                    templateId: t.id,
-                                    importance: t.importance,
-                                    liberty: t.liberty,
-                                    beginning: t.beginning,
-                                    ending: t.ending,
-                                  };
-                                  id = n.id;
-                                  d.nodes.push(n);
-                                });
-                                if (id) updateView({ selected: id });
-                              }}
-                            >
-                              <Plus size={13} />
-                              Place
-                            </button>
-                            <button
-                              className="text-button"
-                              onClick={() => {
-                                setTemplateEdit(t.id);
-                                setFormName(t.name);
-                                setFormText(
-                                  t.blocks
-                                    .filter((b) => b.type === "text")
-                                    .map((b) => b.text)
-                                    .join("\n\n"),
-                                );
-                                setModal("template");
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <IconButton
-                              label={`Delete template ${t.name}`}
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    "Delete this template and detach its placements, preserving their content?",
-                                  )
-                                )
+                      <div className="search-box">
+                        <Search size={14} />
+                        <input
+                          aria-label="Search templates"
+                          placeholder="Find a recurring thread…"
+                          value={templateSearch}
+                          onChange={(e) => setTemplateSearch(e.target.value)}
+                        />
+                      </div>
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          setTemplateEdit("");
+                          setModal("template");
+                        }}
+                      >
+                        <Plus size={14} />
+                        New template
+                      </button>
+                      {p.templates
+                        .filter((t) =>
+                          (t.name + " " + (t.description || ""))
+                            .toLowerCase()
+                            .includes(templateSearch.toLowerCase()),
+                        )
+                        .map((t) => (
+                          <div className="resource-card" key={t.id}>
+                            <div>
+                              <Copy size={16} />
+                              <h4>{t.name}</h4>
+                            </div>
+                            <p>
+                              {t.blocks
+                                .filter((b) => b.type === "text")
+                                .map((b) => b.text)
+                                .join("\n")}
+                            </p>
+                            <small>
+                              {
+                                p.nodes.filter((n) => n.templateId === t.id)
+                                  .length
+                              }{" "}
+                              linked placements
+                            </small>
+                            <div className="resource-actions">
+                              <button
+                                className="text-button"
+                                disabled={!chapter}
+                                onClick={() => {
+                                  let id = "";
                                   change((d) => {
-                                    const linked = d.nodes.filter(
-                                      (n) => n.templateId === t.id,
-                                    );
-                                    linked.forEach((n) => assertEditable(d, n));
-                                    linked.forEach((n) => detach(d, n));
-                                    d.templates = d.templates.filter(
-                                      (x) => x.id !== t.id,
-                                    );
+                                    const c = d.chapters.find(
+                                      (c) => c.id === chapter!.id,
+                                    )!;
+                                    assertEditable(d, c);
+                                    const n = {
+                                      ...newNode(c.id),
+                                      blocks: [],
+                                      templateId: t.id,
+                                      importance: t.importance,
+                                      liberty: t.liberty,
+                                      beginning: t.beginning,
+                                      ending: t.ending,
+                                    };
+                                    id = n.id;
+                                    d.nodes.push(n);
                                   });
-                              }}
-                            >
-                              <Trash2 size={13} />
-                            </IconButton>
+                                  if (id) updateView({ selected: id });
+                                }}
+                              >
+                                <Plus size={13} />
+                                Place
+                              </button>
+                              <button
+                                className="text-button"
+                                onClick={() => {
+                                  setTemplateEdit(t.id);
+                                  setFormName(t.name);
+                                  setFormText(
+                                    t.blocks
+                                      .filter((b) => b.type === "text")
+                                      .map((b) => b.text)
+                                      .join("\n\n"),
+                                  );
+                                  setModal("template");
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <IconButton
+                                label={`Duplicate template ${t.name}`}
+                                onClick={() =>
+                                  change((d) => {
+                                    d.templates.push({
+                                      ...clone(t),
+                                      id: uid(),
+                                      name: t.name + " (copy)",
+                                      blocks: clone(t.blocks).map((b) => ({
+                                        ...b,
+                                        id: uid(),
+                                      })),
+                                    });
+                                  })
+                                }
+                              >
+                                <Copy size={13} />
+                              </IconButton>
+                              <IconButton
+                                label={`Delete template ${t.name}`}
+                                onClick={() => {
+                                  if (
+                                    confirm(
+                                      "Delete this template and detach its placements, preserving their content?",
+                                    )
+                                  )
+                                    change((d) => {
+                                      const linked = d.nodes.filter(
+                                        (n) => n.templateId === t.id,
+                                      );
+                                      linked.forEach((n) =>
+                                        assertEditable(d, n),
+                                      );
+                                      linked.forEach((n) => detach(d, n));
+                                      d.templates = d.templates.filter(
+                                        (x) => x.id !== t.id,
+                                      );
+                                    });
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </IconButton>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                       {!p.templates.length && (
                         <p className="small-note">
                           Select a node and choose Save template to start your
@@ -2669,6 +3019,51 @@ export default function App() {
           </IconButton>
         </div>
       )}
+      {modal === "archiveConflict" && archiveConflict && (
+        <ModalShell
+          title="This story is already on your desk."
+          subtitle="Open the saved project, or import this backup as an independent copy."
+          onClose={() => setModal(null)}
+        >
+          <p>{archiveConflict.name}</p>
+          <div className="modal-footer">
+            <button
+              className="button"
+              onClick={() =>
+                void run(async () => {
+                  const existing = (await listProjects()).find(
+                    (project) => project.id === archiveConflict.id,
+                  );
+                  if (!existing)
+                    throw new Error(
+                      "The existing project could not be found. Try importing again.",
+                    );
+                  await openProject(existing);
+                  setModal(null);
+                })
+              }
+            >
+              Open existing
+            </button>
+            <button
+              className="primary"
+              onClick={() =>
+                void run(async () => {
+                  const copy = await saveProject(
+                    duplicateProject(archiveConflict),
+                    0,
+                  );
+                  await openProject(copy);
+                  setModal(null);
+                })
+              }
+            >
+              <Copy size={15} />
+              Import a copy
+            </button>
+          </div>
+        </ModalShell>
+      )}
       {modal === "new" && (
         <ModalShell
           title="A new story starts here."
@@ -2698,6 +3093,27 @@ export default function App() {
                 onChange={(e) => setFormText(e.target.value)}
               />
             </Field>
+            <Field label="Project template">
+              <select
+                aria-label="Project template"
+                value={projectTemplate}
+                onChange={(e) => setProjectTemplate(e.target.value)}
+              >
+                <option value="">Blank project</option>
+                {projectTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <p className="small-note">
+              {projectTemplates.find((t) => t.id === projectTemplate)
+                ?.description ||
+                "Start with an empty chapter. Add a guided workbook at any time."}
+              {projectTemplate &&
+                " Includes chapter headings and fill-in questions; your answers shape the story."}
+            </p>
             <div className="modal-footer">
               <button
                 type="button"
@@ -2979,87 +3395,17 @@ export default function App() {
         </ModalShell>
       )}
       {modal === "template" && p && (
-        <ModalShell
-          title={
-            templateEdit
-              ? "Edit linked template"
-              : "Keep this thread for later."
-          }
-          subtitle={
-            templateEdit
-              ? `Changes affect ${p.nodes.filter((n) => n.templateId === templateEdit).length} linked placements. Their weights stay the same.`
-              : "Reuse this content throughout your story, with independent weights."
-          }
+        <TemplateEditor
+          project={p}
+          template={p.templates.find((t) => t.id === templateEdit)}
+          source={selected}
           onClose={() => setModal(null)}
-        >
-          <Field label="Template name">
-            <input
-              autoFocus
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-            />
-          </Field>
-          {templateEdit && (
-            <Field label="Text content">
-              <textarea
-                className="template-text"
-                value={formText}
-                onChange={(e) => setFormText(e.target.value)}
-              />
-            </Field>
-          )}
-          {templateEdit && (
-            <p className="small-note">
-              Placements:{" "}
-              {p.nodes
-                .filter((n) => n.templateId === templateEdit)
-                .map((n) => p.chapters.find((c) => c.id === n.chapterId)?.title)
-                .join(", ") || "None yet"}
-            </p>
-          )}
-          <div className="modal-footer">
-            <button
-              className="primary"
-              disabled={!formName.trim()}
-              onClick={() => {
-                try {
-                  w.change((d) => {
-                    if (templateEdit) {
-                      d.nodes
-                        .filter((n) => n.templateId === templateEdit)
-                        .forEach((n) => assertEditable(d, n));
-                      const t = d.templates.find((t) => t.id === templateEdit)!;
-                      t.name = formName;
-                      t.title = formName;
-                      const media = t.blocks.filter((b) => b.type !== "text");
-                      t.blocks = [textBlock(formText), ...media];
-                    } else if (selected) {
-                      d.templates.push({
-                        id: uid(),
-                        name: formName,
-                        title: selected.title,
-                        blocks: clone(resolvedBlocks(d, selected)).map((b) => ({
-                          ...b,
-                          id: uid(),
-                        })),
-                        importance: selected.importance,
-                        liberty: selected.liberty,
-                        beginning: selected.beginning,
-                        ending: selected.ending,
-                      });
-                    }
-                  });
-                  setModal(null);
-                  setTab("templates");
-                } catch (e) {
-                  notify((e as Error).message);
-                }
-              }}
-            >
-              Save template
-            </button>
-          </div>
-        </ModalShell>
+          onSave={(value) => {
+            w.change((d) => updateTemplate(d, value));
+            setModal(null);
+            setTab("templates");
+          }}
+        />
       )}
       {modal === "resource" && p && (
         <ModalShell title="Reference material" onClose={() => setModal(null)}>
@@ -3198,19 +3544,57 @@ function Weight({
 }
 function MediaBlock({ p, b }: { p: Project; b: Block }) {
   const a = p.assets.find((a) => a.id === b.assetId);
-  if (!a)
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => setFailed(false), [a?.hash]);
+  if (!a || (!a.data && a.size > 0))
     return (
       <p className="warning">Attachment missing. Restore it from a backup.</p>
     );
   const src = `data:${a.mediaType};base64,${a.data}`;
   return (
     <figure className="media-block">
-      {b.type === "image" ? (
-        <img loading="lazy" src={src} alt={b.alt || b.caption || a.filename} />
+      {failed ? (
+        <div className="warning" role="status">
+          Unable to play or display {a.filename}. The original attachment is
+          preserved.
+          <button
+            className="text-button"
+            onClick={() => {
+              setFailed(false);
+              setAttempt((v) => v + 1);
+            }}
+          >
+            Retry
+          </button>
+          <a href={src} download={a.filename}>
+            Download attachment
+          </a>
+        </div>
+      ) : b.type === "image" ? (
+        <img
+          key={attempt}
+          loading="lazy"
+          src={src}
+          alt={b.alt || b.caption || a.filename}
+          onError={() => setFailed(true)}
+        />
       ) : (
-        <audio controls preload="none" src={src} />
+        <audio
+          key={attempt}
+          controls
+          preload="none"
+          src={src}
+          onError={() => setFailed(true)}
+        />
       )}
       <figcaption>{b.caption}</figcaption>
+      {b.type === "audio" && b.text && (
+        <details>
+          <summary>Transcript</summary>
+          <p style={{ whiteSpace: "pre-wrap" }}>{b.text}</p>
+        </details>
+      )}
     </figure>
   );
 }

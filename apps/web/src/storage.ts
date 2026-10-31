@@ -102,11 +102,11 @@ export async function deleteProject(id: string) {
 }
 export async function deliver(result: { filename: string; blob: Blob }) {
   if (edition === "desktop") {
-    const saved=await invoke<boolean>("write_export", {
+    const saved = await invoke<boolean>("write_export", {
       filename: result.filename,
       bytes: Array.from(new Uint8Array(await result.blob.arrayBuffer())),
     });
-    if(!saved) throw new Error("Export cancelled.");
+    if (!saved) throw new Error("Export cancelled.");
     return;
   }
   const url = URL.createObjectURL(result.blob),
@@ -116,12 +116,25 @@ export async function deliver(result: { filename: string; blob: Blob }) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-export async function publishProject(project:Project,includeSuspended:boolean){
-  if(edition==='desktop'){
-    const saved=await invoke<boolean>('publish_project',{project,includeSuspended});
-    if(!saved)throw new Error('Export cancelled.');
-  }else if(edition==='php') {
-    const out=await api('publish',{id:project.id,revision:project.revision,includeSuspended});
-    await deliver(await publishBlob(project,includeSuspended,out.publication));
-  }else await deliver(await publishBlob(project,includeSuspended));
+export async function publishProject(
+  project: Project,
+  includeSuspended: boolean,
+) {
+  if (edition === "desktop") {
+    const saved = await invoke<boolean>("publish_project", {
+      id: project.id,
+      revision: project.revision,
+      includeSuspended,
+    });
+    if (!saved) throw new Error("Export cancelled.");
+  } else if (edition === "php") {
+    const out = await api("publish", {
+      id: project.id,
+      revision: project.revision,
+      includeSuspended,
+    });
+    await deliver(
+      await publishBlob(project, includeSuspended, out.publication),
+    );
+  } else await deliver(await publishBlob(project, includeSuspended));
 }

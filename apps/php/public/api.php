@@ -10,7 +10,7 @@ session_name('storytracks');session_set_cookie_params(['httponly'=>true,'samesit
 $_SESSION['csrf']??=bin2hex(random_bytes(32));
 $local=in_array($_SERVER['REMOTE_ADDR']??'', ['127.0.0.1','::1'],true);
 $authenticated=($_SESSION['authenticated']??false)||($local&&$config['password_hash']==='');
-function reply(array $body,int $status=200): never {http_response_code($status);echo json_encode($body,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE);exit;}
+function reply(array $body,int $status=200): never {http_response_code($status);echo json_encode(wire_value($body),JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE);exit;}
 try {
     $action=$_GET['action']??'session';
     if($action==='session')reply(['authenticated'=>$authenticated,'csrf'=>$_SESSION['csrf']]);
