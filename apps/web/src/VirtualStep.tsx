@@ -32,7 +32,10 @@ export default function VirtualStep({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(initial);
-  const height = useRef(estimatedHeight);
+  const height = useRef({
+    estimate: estimatedHeight,
+    measured: estimatedHeight,
+  });
   const mounted = visible || pinned;
   useEffect(() => {
     const element = ref.current!;
@@ -65,7 +68,10 @@ export default function VirtualStep({
     if (!mounted || !ref.current) return;
     const element = ref.current;
     const measure = () => {
-      height.current = element.offsetHeight || estimatedHeight;
+      height.current = {
+        estimate: estimatedHeight,
+        measured: element.offsetHeight || estimatedHeight,
+      };
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -78,7 +84,11 @@ export default function VirtualStep({
       ref={ref}
       className={className}
       style={{
-        minHeight: mounted ? undefined : height.current,
+        minHeight: mounted
+          ? undefined
+          : height.current.estimate === estimatedHeight
+            ? height.current.measured
+            : estimatedHeight,
         scrollMarginTop: 28,
       }}
     >

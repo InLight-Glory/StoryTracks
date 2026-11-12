@@ -368,10 +368,9 @@ select {
 }
 @container (min-width: 65em) {
   .canvas-board {
-    grid-template-columns: var(--context-column, minmax(0, 0.85fr)) minmax(
-        0,
-        2fr
-      ) var(--highlight-column, minmax(0, 0.85fr));
+    grid-template-columns:
+      var(--context-column, minmax(0, 0.85fr)) minmax(0, 2fr)
+      var(--highlight-column, minmax(0, 0.85fr));
     padding-inline: 20px;
   }
   .canvas-board .story-canvas {

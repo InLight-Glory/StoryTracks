@@ -20,6 +20,7 @@ import NodeTextField from "./NodeTextField";
 import { Annotations, HandwritingEditor } from "./Drawing";
 import { blankPage } from "./ink";
 import { drawingAsset, saveDrawing } from "./handwriting";
+import { replacementStarter } from "./starter";
 import {
   clickedOffset,
   focusAt,
@@ -484,6 +485,14 @@ export default function App() {
         );
       } catch {}
       const chapter = orderedChapters(project)[0]?.id || "";
+      if (saved.chapter && !project.chapters.some((c) => c.id === saved.chapter)) {
+        // The saved position may refer to a chapter in a replaced starter.
+        delete saved.chapter;
+        delete saved.selected;
+        delete saved.part;
+        delete saved.collapsed;
+        delete saved.scroll;
+      }
       setView({
         ...initialView,
         left: window.innerWidth > 1100,
@@ -511,13 +520,29 @@ export default function App() {
       return;
     }
     setAuthenticated(true);
-    const all = await refresh();
+    let all = await refresh();
     if (!all.length && !localStorage.getItem("storytracks-initialized")) {
       const demo = await saveProject(demoProject(), 0);
       localStorage.setItem("storytracks-initialized", "1");
       setProjects([demo]);
       await openProject(demo);
     } else {
+      for (const project of all) {
+        try {
+          const replacement = await replacementStarter(project);
+          if (!replacement) continue;
+          const saved = await saveProject(replacement, project.revision);
+          all = all.map((item) => item.id === saved.id ? saved : item);
+          setProjects(all);
+        } catch (error) {
+          // Re-read the library if another window saved this project first.
+          all = await refresh();
+          if (all.some((item) => item.id === project.id && item.revision === project.revision)) {
+            notify(`Could not update the starter story. ${(error as Error).message}`);
+          }
+          break;
+        }
+      }
       const last = all.find(
         (x) => x.id === localStorage.getItem("storytracks-last"),
       );
@@ -600,7 +625,11 @@ export default function App() {
       window.removeEventListener("blur", release);
     };
   }, [w.undo, w.redo, p, modal, handwritten]);
-  function zoomCanvas(percent: number, point?: { x: number; y: number }, fit = false) {
+  function zoomCanvas(
+    percent: number,
+    point?: { x: number; y: number },
+    fit = false,
+  ) {
     const el = canvas.current;
     const surface = el?.querySelector<HTMLElement>(".canvas-zoom-surface");
     const board = surface?.querySelector<HTMLElement>(".canvas-board");
@@ -610,7 +639,10 @@ export default function App() {
     const next = zoom / 100;
     if (next === previous && !fit) return;
     const viewport = el.getBoundingClientRect();
-    const anchor = point ?? { x: viewport.left + el.clientWidth / 2, y: viewport.top + el.clientHeight / 2 };
+    const anchor = point ?? {
+      x: viewport.left + el.clientWidth / 2,
+      y: viewport.top + el.clientHeight / 2,
+    };
     const before = board.getBoundingClientRect();
     const localX = (anchor.x - before.left) / previous;
     const localY = (anchor.y - before.top) / previous;
@@ -632,7 +664,8 @@ export default function App() {
     if (!el || !surface) return;
     // Match the three-column breakpoint in typography.css.
     const threeColumnWidth = 65 * parseFloat(getComputedStyle(surface).fontSize);
-    zoomCanvas(Math.min(100, Math.floor(((el.clientWidth - 2) * 100) / threeColumnWidth)), undefined, true);
+    const fitZoom = Math.floor(((el.clientWidth - 2) * 100) / threeColumnWidth);
+    zoomCanvas(Math.min(100, fitZoom), undefined, true);
   }
   useEffect(() => {
     const el = canvas.current;
@@ -642,7 +675,10 @@ export default function App() {
       e.preventDefault();
       const surface = el.querySelector<HTMLElement>(".canvas-zoom-surface");
       const previous = (Number(surface?.style.zoom) || 1) * 100;
-      zoomCanvas(previous + (e.deltaY < 0 ? 5 : -5), { x: e.clientX, y: e.clientY });
+      zoomCanvas(previous + (e.deltaY < 0 ? 5 : -5), {
+        x: e.clientX,
+        y: e.clientY,
+      });
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
@@ -692,7 +728,6 @@ export default function App() {
     setTab("node");
     if (p && effective(p, n, "suspended")) setShowSuspended(true);
     if (focus) {
-      updateView({ selected: n.id, chapter: n.chapterId, zoom: 100 });
       setTimeout(
         () =>
           document.getElementById("node-" + n.id)?.scrollIntoView({
@@ -2098,7 +2133,13 @@ export default function App() {
                         top: canvasOffset.y,
                       }}
                     >
-                      <div className="canvas-zoom-surface" style={{ zoom: view.zoom / 100, width: `${Math.max(100, view.zoom)}%` }}>
+                      <div
+                        className="canvas-zoom-surface"
+                        style={{
+                          zoom: view.zoom / 100,
+                          width: `${Math.max(100, view.zoom)}%`,
+                        }}
+                      >
                       <div className={`canvas-board ${listView ? "compact-board" : ""} ${!view.subcontext ? "context-collapsed" : ""} ${!view.highlight ? "highlight-collapsed" : ""}`}>
                         <CanvasArea
                           project={p}
@@ -2163,9 +2204,14 @@ export default function App() {
                                 isSelected = view.selected === n.id,
                                 blocks = resolvedBlocks(p, n),
                                 isLocked = effective(p, n, "locked");
-                              const compactPreview = listView && !isSelected && editing !== n.id;
-                              const previewBlock = compactPreview ? blocks.find((b) => b.type === "text" && b.text.trim()) : undefined;
-                              const visibleBlocks = compactPreview ? (previewBlock ? [previewBlock] : []) : blocks;
+                              const compactPreview =
+                                listView && !isSelected && editing !== n.id;
+                              const previewBlock = compactPreview
+                                ? blocks.find((b) => b.type === "text" && b.text.trim())
+                                : undefined;
+                              const visibleBlocks = !compactPreview
+                                ? blocks
+                                : previewBlock ? [previewBlock] : [];
                               return (
                                 <VirtualStep
                                   id={"node-" + n.id}
@@ -2772,8 +2818,8 @@ export default function App() {
                         label="Fit selected node"
                         onClick={() => {
                           setCanvasOffset({ x: 0, y: 0 });
+                          updateView({ zoom: 100 });
                           if (selected) selectNode(selected, true);
-                          else updateView({ zoom: 100 });
                         }}
                       >
                         <Maximize2 size={14} />

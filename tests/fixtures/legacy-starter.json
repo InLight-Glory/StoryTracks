@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "id": "00000000-0000-4000-8000-000000000003",
+  "revision": 1,
+  "name": "The Cartographer’s Daughter",
+  "description": "Some places can only be found by getting lost.",
+  "createdAt": "2026-11-01T12:00:00.000Z",
+  "updatedAt": "2026-11-01T12:00:00.000Z",
+  "metadata": {
+    "author": "Eleanor Hayes",
+    "genre": "Literary mystery",
+    "audience": "Adult",
+    "language": "English",
+    "style": "Atmospheric, intimate, quietly lyrical",
+    "tone": "Reflective",
+    "mood": "Quiet unease",
+    "pov": "Third person, limited",
+    "tense": "Past",
+    "pacing": "Moderate",
+    "targetLength": "80,000 words",
+    "instructions": "Let the landscape carry what the characters cannot say."
+  },
+  "sections": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "title": "The return",
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "title": "The uncharted",
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "title": "A way home",
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    }
+  ],
+  "chapters": [
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "sectionId": "00000000-0000-4000-8000-000000000001",
+      "title": "A town that remembers",
+      "manualLabel": null,
+      "metadata": {
+        "mood": "Nostalgic, with an undercurrent of unease",
+        "pacing": "Slow"
+      },
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "sectionId": "00000000-0000-4000-8000-000000000001",
+      "title": "The room above the shop",
+      "manualLabel": null,
+      "metadata": {},
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "sectionId": "00000000-0000-4000-8000-000000000001",
+      "title": "Lines that lead nowhere",
+      "manualLabel": null,
+      "metadata": {},
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "sectionId": "00000000-0000-4000-8000-000000000004",
+      "title": "Beyond the river",
+      "manualLabel": null,
+      "metadata": {},
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "sectionId": "00000000-0000-4000-8000-000000000004",
+      "title": "An unfinished map",
+      "manualLabel": null,
+      "metadata": {},
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "sectionId": "00000000-0000-4000-8000-000000000005",
+      "title": "What we choose to keep",
+      "manualLabel": null,
+      "metadata": {},
+      "locked": false,
+      "suspended": false,
+      "trashed": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "chapterId": "00000000-0000-4000-8000-000000000002",
+      "title": "The last train to Bellwether",
+      "kind": "scene",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000012",
+          "type": "text",
+          "text": "After twelve years away, Mara steps onto the platform with one suitcase and a letter she has not opened.\n\nThe station clock is still seven minutes slow. Some things, she thinks, have learned how to stay.",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "locked": false,
+      "suspended": false,
+      "trashed": false,
+      "importance": 9,
+      "liberty": 2,
+      "beginning": 50,
+      "ending": 50
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "chapterId": "00000000-0000-4000-8000-000000000002",
+      "title": "A familiar stranger",
+      "kind": "beat",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000014",
+          "type": "text",
+          "text": "The man at the ticket window knows her name. He asks if she has come for the shop.\n\nShe has come for her father. She does not correct him.",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "locked": false,
+      "suspended": false,
+      "trashed": false,
+      "importance": 6,
+      "liberty": 5,
+      "beginning": 50,
+      "ending": 50
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "chapterId": "00000000-0000-4000-8000-000000000002",
+      "title": "The map in the window",
+      "kind": "turn",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000016",
+          "type": "text",
+          "text": "Her father’s shop is exactly as she remembers, except for the map in the window: a careful rendering of Bellwether with a street that does not exist.",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "locked": false,
+      "suspended": false,
+      "trashed": false,
+      "importance": 11,
+      "liberty": 2,
+      "beginning": 50,
+      "ending": 80
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000017",
+      "chapterId": "00000000-0000-4000-8000-000000000002",
+      "title": "A key, and a question",
+      "kind": "scene",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000018",
+          "type": "text",
+          "text": "Under the familiar loose stone, a brass key waits in an envelope. On the envelope, in her father’s handwriting: “Which way is home?”",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "locked": false,
+      "suspended": false,
+      "trashed": false,
+      "importance": 6,
+      "liberty": 2,
+      "beginning": 50,
+      "ending": 50
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000019",
+      "chapterId": "00000000-0000-4000-8000-000000000006",
+      "title": "Everything in its place",
+      "kind": "beat",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000020",
+          "type": "text",
+          "text": "The room smells of paper, cedar, and the sea. Every drawer is labeled. One is empty.",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "locked": false,
+      "suspended": false,
+      "trashed": false,
+      "importance": 6,
+      "liberty": 2,
+      "beginning": 50,
+      "ending": 50
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "chapterId": "00000000-0000-4000-8000-000000000007",
+      "title": "An impossible address",
+      "kind": "beat",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000022",
+          "type": "text",
+          "text": "Mara walks to the street on the map. The road ends at the water.",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "locked": false,
+      "suspended": false,
+      "trashed": false,
+      "importance": 6,
+      "liberty": 2,
+      "beginning": 50,
+      "ending": 50
+    }
+  ],
+  "templates": [
+    {
+      "id": "00000000-0000-4000-8000-000000000025",
+      "name": "The question of home",
+      "title": "Which way is home?",
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-8000-000000000026",
+          "type": "text",
+          "text": "“Which way is home?”",
+          "caption": "",
+          "alt": ""
+        }
+      ],
+      "importance": 6,
+      "liberty": 2,
+      "beginning": 50,
+      "ending": 50
+    }
+  ],
+  "notes": [
+    {
+      "id": "00000000-0000-4000-8000-000000000023",
+      "ownerId": "00000000-0000-4000-8000-000000000015",
+      "text": "The impossible street is the first real fracture in the familiar. Keep it small. No explanation yet.",
+      "include": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000024",
+      "ownerId": "00000000-0000-4000-8000-000000000003",
+      "text": "Recurring motifs: maps, inherited silences, the unreliable comfort of familiar places.",
+      "include": false
+    }
+  ],
+  "resources": [
+    {
+      "id": "00000000-0000-4000-8000-000000000027",
+      "title": "A note on Bellwether",
+      "kind": "reference",
+      "text": "A fictional coastal town. Once a harbor for survey ships; now a place people pass through. The sea is always audible, never quite visible.",
+      "source": "World-building notes",
+      "createdAt": "2026-11-01T12:00:00.000Z",
+      "include": false
+    }
+  ],
+  "assets": []
+}

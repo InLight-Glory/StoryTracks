@@ -1,5 +1,7 @@
 # StoryTracks
 
+**[Try StoryTracks online](https://inlightglory.com/tool/storytracks/)**
+
 An offline story outlining workspace built from [spec.md](spec.md), with a Rust/Tauri Windows application and a PHP edition sharing the React interface. Organize a book on a vertical canvas, keep writing guidance and historical context alongside it, and publish portable Markdown.
 
 ## Run the built application
@@ -31,6 +33,8 @@ Use a slider or enter a pixel size for **Titles** (24–48), **Subtitles** (16�
 Select text to show the floating formatting toolbar: **bold, italic, underline, strikethrough, highlight, inline code, headings, bulleted/numbered lists, and quotes**. It works directly on rendered story text and in writing fields, notes, planning answers, resources, and template text. Ctrl/Cmd+B, I, and U apply bold, italic, and underline to the selection. Formatting is stored as Markdown, with attribute-free `<u>` and `<mark>` tags for underline and highlighting; story reading and formatted publication previews display these styles. Locked nodes and linked template placements remain protected. Edit linked content through its template editor.
 
 Hold **Space and drag**, or drag with the middle mouse button, to move the canvas freely left, right, up, or down at any zoom. **Reset canvas position** returns to the origin; **Fit selected node** brings the chosen node back into view. Space continues to insert spaces in writing fields.
+
+The canvas zoom controls scale the whole writing desk. Zoom out or choose **Fit canvas width** to bring Sub-context, Main story, and Highlight into view side by side in a smaller window. **Canvas view** shows full story cards. **Compact view** shows short previews and expands the selected node for reading and editing.
 
 Use **Find** in the outline or **Ctrl+F** to search; enable the **Replace** toggle or use **Ctrl+H** for replacement controls in the same dialog. The outline and dialog share the query and both offer an × clear button. Clicking a part name focuses all of its chapters; the adjacent arrow expands/collapses it. Find starts in the focused chapter, part, or whole book, and its **Search in** picker changes that scope. Optional case and whole-word matching, highlighted match navigation, node reveal, and single/bulk replacement are available. Search story titles and node text, or expand to notes, resources, and the workbook. Suspended material is included; trash is excluded. Locked material and linked template placements are read-only here; edit reusable template content through its template editor.
 
