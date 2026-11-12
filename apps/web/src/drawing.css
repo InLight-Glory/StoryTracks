@@ -1,0 +1,318 @@
+.canvas-board {
+  position: relative;
+}
+.annotation-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.ink-surface {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.ink-surface.ink-active {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+.annotation-layer > .ink-surface {
+  position: absolute;
+  inset: 0;
+}
+.annotation-toolbar-host {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+.annotation-tools {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px var(--shadow);
+  pointer-events: auto;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+}
+.annotation-drag-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 44px;
+  flex-shrink: 0;
+  color: var(--muted);
+  background: var(--raised);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.annotation-drag-handle:active {
+  cursor: grabbing;
+}
+.annotation-tool-body {
+  padding: 10px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.annotation-tool-body > .primary {
+  margin-top: 8px;
+}
+.ink-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ink-tools label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.ink-tools input[type="color"] {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+}
+.ink-tools input[type="range"] {
+  width: 70px;
+  padding: 0;
+}
+.ink-tools .button {
+  padding: 7px;
+}
+.ink-tools button[aria-pressed="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ink-colors {
+  display: flex;
+  gap: 5px;
+}
+.ink-colors button {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+.handwriting-editor {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 50vw;
+  height: 100dvh;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 35px var(--shadow);
+}
+.handwriting-editor.ink-left {
+  left: 0;
+}
+.handwriting-editor.ink-right {
+  right: 0;
+}
+.handwriting-editor.ink-wide {
+  width: 90vw;
+  left: 5vw;
+  right: 5vw;
+}
+.handwriting-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+}
+.handwriting-heading input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-subtitles);
+}
+.handwriting-editor > .ink-tools {
+  padding: 0 12px 10px;
+}
+.handwriting-paper-space {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  overflow: hidden;
+}
+.handwriting-paper {
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+}
+.ink-paper-viewport {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.ink-paper-viewport > .ink-surface {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  pointer-events: auto;
+  touch-action: none;
+}
+.ink-surface.ink-can-pan {
+  cursor: grab;
+}
+.ink-surface.ink-panning {
+  cursor: grabbing;
+}
+.ink-pan-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ink-pan-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 48px;
+  padding: 2px 6px;
+  background: var(--panel);
+  color: var(--text);
+}
+.ink-pan-navigation .button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+}
+.ink-pan-navigation input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  touch-action: pan-y;
+}
+.handwriting-editor > .ink-tools,
+.handwriting-heading,
+.handwriting-footer {
+  flex-shrink: 0;
+}
+.handwriting-editor button {
+  touch-action: manipulation;
+}
+@media (pointer: coarse), (max-width: 600px) {
+  .handwriting-editor .ink-tools .button,
+  .handwriting-heading .button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .handwriting-editor .ink-tools input[type="color"] {
+    width: 44px;
+    height: 44px;
+  }
+}
+.handwriting-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+}
+.handwriting-footer span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.handwritten-open {
+  width: 100%;
+  min-height: 160px;
+  margin-block: 12px;
+  background: #ffffff;
+  color: #172b3a;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.node-dot.handwritten {
+  background: var(--info);
+}
+@media (max-width: 600px) {
+  .ink-colors {
+    display: none;
+  }
+  .handwriting-heading {
+    gap: 4px;
+    padding: 8px;
+  }
+  .handwriting-heading input {
+    width: 100%;
+    font-size: 14px;
+  }
+  .handwriting-editor > .ink-tools {
+    padding-inline: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .handwriting-editor > .ink-tools > * {
+    flex-shrink: 0;
+  }
+  .handwriting-editor .ink-pan-tool span {
+    display: none;
+  }
+  .handwriting-footer {
+    display: grid;
+    justify-items: start;
+    gap: 6px;
+  }
+}
+@media (max-width: 600px), (pointer: coarse) and (max-height: 600px) {
+  .handwriting-editor.ink-left,
+  .handwriting-editor.ink-right {
+    width: 90vw;
+    left: 5vw;
+    right: 5vw;
+  }
+  .handwriting-heading .handwriting-layout-control {
+    display: none;
+  }
+}
+@media (max-height: 500px) {
+  .handwriting-heading {
+    display: flex;
+    padding: 4px 6px;
+  }
+  .handwriting-heading input {
+    font-size: 14px;
+  }
+  .handwriting-editor > .ink-tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0 6px 6px;
+    scrollbar-width: thin;
+  }
+  .handwriting-editor > .ink-tools > * {
+    flex-shrink: 0;
+  }
+  .handwriting-editor .ink-colors {
+    display: none;
+  }
+  .handwriting-footer {
+    display: flex;
+    flex-wrap: nowrap;
+    padding: 4px 6px;
+  }
+  .handwriting-footer span {
+    font-size: 10px;
+  }
+}

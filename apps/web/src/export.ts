@@ -53,87 +53,100 @@ export function publication(p: Project, includeSuspended = false) {
     "## Project writing guidance",
     "",
     ...Object.entries(p.metadata).map(
-      ([k, v]) => `${metadataLabels[k] || k}: ${v}`,
+      ([k, v]) => `- ${metadataLabels[k] || k}: ${v}`,
     ),
     "",
     "## Weight guide",
     "",
-    "Importance: 1–5.5; higher means more important.",
-    "Liberty: 1–5.5; higher allows more deviation.",
-    "Transition sharpness: 0–100; higher means more abrupt.",
+    "- Importance: 1–5.5; higher means more important.",
+    "- Liberty: 1–5.5; higher allows more deviation.",
+    "- Transition sharpness: 0–100; higher means more abrupt.",
     "",
   ];
-  let lastSection = "";
-  for (const c of orderedChapters(p, includeSuspended)) {
-    const section = p.sections.find((s) => s.id === c.sectionId)!;
-    if (lastSection !== section.id) {
+  const appendNotes = (ownerId: string, level: number) => {
+    for (const note of p.notes.filter(
+      (n) => n.include && n.ownerId === ownerId,
+    )) {
+      const label =
+        note.canvasArea === "subcontext"
+          ? "Author’s thoughts"
+          : note.canvasArea === "highlight"
+            ? "Commentary"
+            : "Notes";
       lines.push(
-        `## Section: ${heading(section.title)}${effective(p, section, "suspended") ? " [Suspended]" : ""}`,
-        `Section ID: ${section.id}`,
+        `${"#".repeat(level)} ${label}${note.title ? ": " + heading(note.title) : ""}`,
+        "",
+        note.text
+          .replace(/\r\n?/g, "\n")
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n"),
         "",
       );
-      lastSection = section.id;
     }
+  };
+  if (p.notes.some((n) => n.include && n.ownerId === p.id)) {
+    lines.push("## Project notes", "");
+    appendNotes(p.id, 3);
+  }
+  for (const section of p.sections.filter((s) =>
+    active(p, s, includeSuspended),
+  )) {
     lines.push(
-      `### Chapter ${heading(chapterLabel(p, c))}: ${heading(c.title)}${effective(p, c, "suspended") ? " [Suspended]" : ""}`,
-      `Chapter ID: ${c.id}`,
-      "",
-      ...Object.entries(effectiveMetadata(p, c)).map(
-        ([k, v]) =>
-          `${metadataLabels[k] || k}: ${v || "(cleared)"} (${k in c.metadata ? "chapter override" : "inherited"})`,
-      ),
+      `## Section: ${heading(section.title)}${effective(p, section, "suspended") ? " [Suspended]" : ""}`,
+      `Section ID: ${section.id}`,
       "",
     );
-    for (const n of p.nodes.filter(
-      (n) => n.chapterId === c.id && active(p, n, includeSuspended),
+    appendNotes(section.id, 3);
+    for (const c of orderedChapters(p, includeSuspended).filter(
+      (c) => c.sectionId === section.id,
     )) {
       lines.push(
-        `#### Node: ${heading(nodeTitle(p, n))}${effective(p, n, "suspended") ? " [Suspended]" : ""}`,
-        `Node ID: ${n.id}`,
-        `Importance: ${(n.importance / 2).toFixed(1)}`,
-        `Liberty: ${(n.liberty / 2).toFixed(1)}`,
-        `Beginning sharpness: ${n.beginning} (${sharpness(n.beginning)})`,
-        `Ending sharpness: ${n.ending} (${sharpness(n.ending)})`,
+        `### Chapter ${heading(chapterLabel(p, c))}: ${heading(c.title)}${effective(p, c, "suspended") ? " [Suspended]" : ""}`,
+        `Chapter ID: ${c.id}`,
+        "",
+        "#### Chapter writing guidance",
+        "",
+        ...Object.entries(effectiveMetadata(p, c)).map(
+          ([k, v]) =>
+            `- ${metadataLabels[k] || k}: ${v || "(cleared)"} (${k in c.metadata ? "chapter override" : "inherited"})`,
+        ),
         "",
       );
-      for (const b of resolvedBlocks(p, n)) {
+      appendNotes(c.id, 4);
+      for (const n of p.nodes.filter(
+        (n) => n.chapterId === c.id && active(p, n, includeSuspended),
+      )) {
         lines.push(
-          b.type === "text"
-            ? b.text
-            : media(b.assetId!, b.alt || b.caption, b.type === "image"),
+          `#### Node: ${heading(nodeTitle(p, n))}${effective(p, n, "suspended") ? " [Suspended]" : ""}`,
+          `Node ID: ${n.id}`,
+          "",
+          `- Importance: ${(n.importance / 2).toFixed(1)}`,
+          `- Liberty: ${(n.liberty / 2).toFixed(1)}`,
+          `- Beginning sharpness: ${n.beginning} (${sharpness(n.beginning)})`,
+          `- Ending sharpness: ${n.ending} (${sharpness(n.ending)})`,
           "",
         );
-        if (b.type !== "text" && b.caption) lines.push(b.caption, "");
-        if (b.type === "audio" && b.text)
-          lines.push(`Transcript: ${b.text}`, "");
+        for (const b of resolvedBlocks(p, n)) {
+          lines.push(
+            b.type === "text"
+              ? b.text
+              : media(b.assetId!, b.alt || b.caption, b.type === "image"),
+            "",
+          );
+          if (b.type !== "text" && b.caption) lines.push(b.caption, "");
+          if (b.type === "audio" && b.text)
+            lines.push(`Transcript: ${b.text}`, "");
+        }
+        appendNotes(n.id, 5);
       }
     }
   }
-  const includedIds = new Set([
-    p.id,
-    ...p.sections
-      .filter((s) => active(p, s, includeSuspended))
-      .map((s) => s.id),
-    ...orderedChapters(p, includeSuspended).map((c) => c.id),
-    ...orderedNodes(p, includeSuspended).map((n) => n.id),
-  ]);
-  const notes = p.notes.filter((n) => n.include && includedIds.has(n.ownerId));
   const references = p.resources.filter(
     (r) => r.include && r.kind === "reference",
   );
-  if (notes.length || references.length) {
-    lines.push("## Context and side notes", "");
-    for (const n of notes) {
-      if (n.canvasArea)
-        lines.push(
-          `### ${n.canvasArea === "subcontext" ? "Sub-context" : "Highlight"}${n.title ? ": " + heading(n.title) : ""}`,
-          "",
-        );
-      const owner =
-        n.canvasArea && p.nodes.find((node) => node.id === n.ownerId);
-      if (owner) lines.push(`Connected node: ${heading(nodeTitle(p, owner))}`);
-      lines.push(`Scope ID: ${n.ownerId}`, n.text, "");
-    }
+  if (references.length) {
+    lines.push("## Reference material", "");
     for (const r of references)
       lines.push(
         `### ${heading(r.title)}`,

@@ -15,7 +15,7 @@ StoryTracks organizes instructions and source material for a writer. The initial
 ### 2.1 Rust desktop edition
 
 - Build the desktop application with a Rust domain layer and Tauri desktop shell. Use a shared TypeScript web interface for the canvas, panels, and dashboard. This is a Rust-backed desktop application, with its interface implemented using web technologies.
-- Ship a Windows application executable, `StoryTracks.exe`, and an offline-capable `StoryTracks-setup.exe` installer. A single dependency-free portable executable is not a release requirement.
+- Ship a Windows application executable, `StoryTracks.exe`, and an offline-capable WiX/MSI `StoryTracks-setup.msi` installer. A single dependency-free portable executable is not a release requirement.
 - Bundle all application scripts, styles, fonts, icons, and other required assets locally. Core functionality must never require a login, internet connection, CDN, remote API, or PHP server.
 - Include the WebView2 offline installer in the Windows installer so installation can succeed without downloading dependencies. Tauri supports Windows executable installers and bundled offline runtime installation; see its [Windows distribution documentation](https://v2.tauri.app/distribute/windows-installer/).
 - Use local SQLite persistence and project-managed media files. The Rust layer owns validation, transactions, filesystem access, import, export, and project operations.
@@ -71,6 +71,12 @@ Keep generated distribution artifacts out of source control unless a release wor
 ## 5. Editor layout
 
 Use three resizable regions below a toolbar: flow overview on the left, canvas in the center, and a tabbed inspector on the right. Panels can be collapsed to maximize canvas space. The toolbar exposes project navigation, undo/redo, import, publish, save state, and canvas controls.
+
+The Settings cog contains **Fonts**. Verdana is the initial font for headings, body text, and interface controls. Users can choose installed system fonts, enter a font name when enumeration is unavailable, save a preferred default, restore Verdana, and select from their five most recent unique choices. Save preferences on the current device, separately from project content. Retain independent title, subtitle, main-text, and system-text size controls.
+
+Selecting editable text exposes a floating formatting toolbar with bold, italic, underline, strikethrough, highlighting, inline code, headings, lists, and quotes. Offer this both on rendered story selections and in writing fields. Preserve formatting through saves, backups, and publication, render only explicitly supported safe markup, and respect locks and linked template ownership. Ctrl/Cmd+B, I, and U format the selection.
+
+Space-drag and middle-button drag pan the canvas freely in both axes, even when its contents fit the viewport. Keep normal Space behavior in text fields, end panning on release/cancel or loss of focus, and provide a reset-position control.
 
 ### 5.1 Left panel: flow overview
 
@@ -232,7 +238,8 @@ This mode is literal paragraph splitting, including blank lines within Markdown 
 - Export the durable project revision captured at the start of publication. Later edits must not cause mixed-revision output. If unsaved edits cannot be persisted, report the failure and do not silently export an older revision.
 - Include active sections, chapters, and nodes in canonical sequence. Exclude trash always. Exclude suspended content by default; an explicit “Include suspended material” option includes it in its original position with clear status labels.
 - Include project metadata, chapter metadata and effective writing guidance, resolved node content, node weights, and transition settings.
-- Include selected side notes/resources in clearly marked context sections, separate from the narrative outline.
+- Place selected node notes immediately after their node’s content, under “Author’s thoughts”, “Commentary”, or “Notes” headings with blockquoted bodies. Place project, section, and chapter notes with their respective scope, including sections without chapters. Keep general resources under “Reference material”. Preserve individual inclusion flags and owner suspension/trash rules.
+- Present project and effective chapter writing guidance, weights, and transition settings as lists. Label chapter writing guidance explicitly above its nodes.
 - With included transcripts, also generate `(project name)-history.md` and link it from the main document. Preserve separate headings and source information for each transcript.
 - Copy referenced images/audio/included resource files into an `assets/` folder and use relative Markdown links. Do not export absolute local paths or machine-specific user directories.
 - Use Markdown image syntax for images and normal file links for audio, with captions and optional transcript text. Audio playback depends on the reader.
@@ -256,31 +263,47 @@ exported_at: "<ISO-8601 UTC>"
 # Example Book — StoryTrack
 
 ## Project writing guidance
-Style: lyrical
-Tone: reflective
-Mood: uneasy
+
+- Style: lyrical
+- Tone: reflective
+- Mood: uneasy
 
 ## Weight guide
-Importance: 1–5.5; higher means more important.
-Liberty: 1–5.5; higher allows more deviation.
-Transition sharpness: 0–100; higher means more abrupt.
+
+- Importance: 1–5.5; higher means more important.
+- Liberty: 1–5.5; higher allows more deviation.
+- Transition sharpness: 0–100; higher means more abrupt.
 
 ## Section: Arrival
 
 ### Chapter 1: The Station
-Pacing: slow (chapter override)
-Tone: reflective (inherited)
+
+#### Chapter writing guidance
+
+- Pacing: slow (chapter override)
+- Tone: reflective (inherited)
 
 #### Node: The empty platform
 Node ID: <stable-id>
-Importance: 3.0
-Liberty: 1.0
-Beginning sharpness: 50 (moderate)
-Ending sharpness: 50 (moderate)
+
+- Importance: 3.0
+- Liberty: 1.0
+- Beginning sharpness: 50 (moderate)
+- Ending sharpness: 50 (moderate)
 
 The train arrives, but nobody is waiting.
 
 ![Station reference](assets/<asset-id>.png)
+
+##### Author’s thoughts: The mood
+
+> This arrival should feel familiar but unsettling.
+
+##### Commentary
+
+> Echo the station description later in the book.
+
+## Historical context
 
 [Historical context](Example%20Book-history.md)
 ```
@@ -386,3 +409,21 @@ Initial release excludes cloud synchronization, real-time collaboration, automat
 - Each study preserves the original statement, candidate questions, selected/authored underlying question, insight/assumptions, other possible answers, intended audience, and a marketing hook.
 - Authors can use the underlying question as an editable hook and send a question study to a chosen unlocked outline chapter. No marketing copy is posted or transmitted automatically.
 - All workbook content autosaves, participates in undo/redo and portable backups, survives duplication with consistent IDs, and is independently validated by Rust and PHP. Publication is opt-in per prompt, world entry, or question study and appears in clearly labeled workbook sections.
+
+## 16. Find/Replace and outline organization
+
+- Find uses one dialog, available from the outline and Ctrl+F. A Replace toggle reveals replacement controls; Ctrl+H opens the same dialog with Replace enabled. The query is shared with the outline and both fields offer an × clear button. Literal search supports case sensitivity and whole-word matching, highlighted occurrences, previous/next navigation, and revealing a matching node.
+- Authors can replace the current editable occurrence or all editable occurrences in a single undoable action. Search includes suspended material and excludes trash. Locked material and linked template placements remain searchable but cannot be replaced through this dialog.
+- Scope can cover story titles and node text, or additionally notes, resources, and workbook text.
+- Search starts in the focused chapter, part, or whole book and offers a Search in picker. Clicking a part name focuses its chapters; its separate arrow expands/collapses the outline group.
+- Organization uses the left panel only, with a selection type (nodes, chapters, parts), checkboxes, selected count, destination picker, Move/Copy, and Move up/down. There is no duplicate organization modal.
+- Selected nodes can move/copy into a chapter or into a part through one newly created unnamed chapter. Selected chapters can move/copy into a part. Parts can be copied with their contents and reordered.
+- Selected items retain narrative order regardless of selection order. Copies remap item/block/note IDs, preserve media references and linked-template associations, and include non-trashed descendants and connected notes. Copies start unlocked.
+- Shift-clicking a node checkbox adds the visible sequence from the most recently selected node in either direction, with the clicked endpoint becoming the next anchor. Collapsed and filtered-out nodes are skipped.
+- Moves respect inherited locks and locked sibling boundaries; a blocked selection applies no partial changes. Each bulk operation autosaves and is one undo step.
+
+## 17. Publication preview and source-document workflow
+
+- Publication preview offers Formatted and Plain text views of the same Markdown snapshot. Rendering includes packaged images and inert links; switching views does not change export content.
+- TXT and Markdown resource uploads accept missing/generic Windows MIME types, load editable text, and retain original attachment bytes. Text decoding supports UTF-8, BOM-marked UTF-16, and Windows-1252. Downloading verifies the original bytes and avoids data-URL network requests, which the desktop policy blocks.
+- A standalone Markdown guide instructs an external AI to extract DOCX/DOC/PDF and other documents, reconstruct source-grounded parts/chapters/nodes, fill metadata, distinguish inferred sub-context from commentary, track coverage, and package an importable version-1 StoryTracks archive. It does not add automatic Word/PDF conversion to the application itself.

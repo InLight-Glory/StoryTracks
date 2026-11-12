@@ -1,7 +1,33 @@
-import ReactMarkdown from "react-markdown";
+import { FormattedTextarea } from "./SelectionToolbar";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { inlineFormatting } from "./textFormatting";
+import SelectionToolbar from "./SelectionToolbar";
 import TemplateEditor from "./TemplateEditor";
 import VirtualStep from "./VirtualStep";
 import CanvasArea from "./CanvasArea";
+import {
+  attachmentType,
+  textAttachment,
+  attachmentDownload,
+} from "./attachments";
+import FindReplace from "./FindReplace";
+import OutlineOrganizer from "./OutlineOrganizer";
+import FontSettings, { useFontSettings } from "./FontSettings";
+import ThemeSettings, { useThemeSettings } from "./ThemeSettings";
+import Tutorial, { needsTutorial, rememberTutorial } from "./Tutorial";
+import NodeTextField from "./NodeTextField";
+import { Annotations, HandwritingEditor } from "./Drawing";
+import { blankPage } from "./ink";
+import { drawingAsset, saveDrawing } from "./handwriting";
+import {
+  clickedOffset,
+  focusAt,
+  sourcePositions,
+  selectedSourceRange,
+  type EditSnapshot,
+} from "./nodeEditing";
+import { organize, selectRange, type OrganizeKind } from "./organize";
 import PlanningWorkspace, {
   PlanningNavigation,
   planningTitles,
@@ -13,10 +39,12 @@ import {
 } from "./planning";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import {
   ArrowDown,
@@ -50,9 +78,12 @@ import {
   PanelLeftClose,
   PanelRightClose,
   Pause,
+  PenLine,
   Plus,
   Redo2,
   Search,
+  Scan,
+  Settings,
   Settings2,
   Sparkles,
   StickyNote,
@@ -107,6 +138,7 @@ import {
   readArchive,
   sharpness,
   toBase64,
+  fromBase64,
   wordCount,
 } from "./export";
 import {
@@ -131,14 +163,20 @@ type Modal =
   | "template"
   | "resource"
   | "archiveConflict"
+  | "find"
+  | "settings"
+  | "tutorial"
   | null;
 type Tab = "node" | "chapter" | "project" | "notes" | "resources" | "templates";
 type ViewState = {
   selected: string;
   chapter: string;
+  part: string;
   zoom: number;
   left: boolean;
   right: boolean;
+  subcontext: boolean;
+  highlight: boolean;
   all: boolean;
   collapsed: string[];
   leftWidth: number;
@@ -148,20 +186,28 @@ type ViewState = {
 const initialView: ViewState = {
   selected: "",
   chapter: "",
+  part: "",
   zoom: 100,
   left: true,
   right: true,
+  subcontext: true,
+  highlight: true,
   all: false,
   collapsed: [],
   leftWidth: 264,
   rightWidth: 310,
   scroll: 0,
 };
+const nodeMarkdownComponents: Components = {
+  img: () => null,
+  a: ({ children }) => <span>{children}</span>,
+};
 const icons = {
   beat: Circle,
   scene: FileText,
   note: StickyNote,
   turn: Sparkles,
+  handwritten: PenLine,
 };
 function IconButton({
   label,
@@ -226,6 +272,7 @@ function ModalShell({
   return (
     <dialog
       className={`modal ${wide ? "wide" : ""}`}
+      aria-label={title}
       ref={dialog}
       onCancel={onClose}
       onClick={(e) => {
@@ -248,14 +295,19 @@ function ModalShell({
 export default function App() {
   const w = useWorkspace(),
     p = w.project;
+  const fontSettings = useFontSettings();
+  const themeSettings = useThemeSettings();
+  const [handwritten, setHandwritten] = useState("");
+  const [annotating, setAnnotating] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(true);
   const [loading, setLoading] = useState(true),
     [authenticated, setAuthenticated] = useState(true),
     [password, setPassword] = useState("");
   const [projects, setProjects] = useState<Project[]>([]),
     [view, setView] = useState<ViewState>(() => ({
       ...initialView,
-      left: window.innerWidth > 760,
-      right: window.innerWidth > 760,
+      left: window.innerWidth > 1100,
+      right: window.innerWidth > 1100,
     })),
     [tab, setTab] = useState<Tab>("node");
   const [modal, setModal] = useState<Modal>(null),
@@ -263,6 +315,40 @@ export default function App() {
     [search, setSearch] = useState(""),
     [projectSearch, setProjectSearch] = useState(""),
     [sort, setSort] = useState("recent");
+  const [organizing, setOrganizing] = useState(false);
+  const [organizeKind, setOrganizeKind] = useState<OrganizeKind>("nodes");
+  const [organizeSelection, setOrganizeSelection] = useState<string[]>([]);
+  const rangeAnchor = useRef("");
+  const [replaceInitially, setReplaceInitially] = useState(false);
+  const matchesSearch = (project: Project, n: StoryNode) =>
+    !search ||
+    nodeTitle(project, n).toLowerCase().includes(search.toLowerCase()) ||
+    resolvedBlocks(project, n).some((b) =>
+      b.text.toLowerCase().includes(search.toLowerCase()),
+    );
+  const toggleOrganize = (id: string, shift = false) => {
+    const order = p
+      ? orderedNodes(p, showSuspended)
+          .filter(
+            (n) =>
+              !view.collapsed.includes(n.chapterId) &&
+              !view.collapsed.includes(
+                p.chapters.find((c) => c.id === n.chapterId)!.sectionId,
+              ) &&
+              matchesSearch(p, n),
+          )
+          .map((n) => n.id)
+      : [];
+    {
+      const ids = organizeSelection;
+      const anchor = ids.includes(rangeAnchor.current)
+        ? rangeAnchor.current
+        : ids.at(-1) || "";
+      const next = selectRange(ids, order, anchor, id, shift);
+      if (next.includes(id)) rangeAnchor.current = id;
+      setOrganizeSelection(next);
+    }
+  };
   const [sectionSettings, setSectionSettings] = useState("");
   const [workspaceTab, setWorkspaceTab] = useState<PlanningMode>("outline");
   const [planningSelection, setPlanningSelection] = useState("");
@@ -286,6 +372,25 @@ export default function App() {
     [showSuspended, setShowSuspended] = useState(false),
     [editing, setEditing] = useState(""),
     [listView, setListView] = useState(false);
+  const editSnapshot = useRef<EditSnapshot | null>(null);
+  useLayoutEffect(() => {
+    if (!editing) {
+      editSnapshot.current = null;
+      return;
+    }
+    const snapshot = editSnapshot.current;
+    if (!snapshot || snapshot.id !== editing) return;
+    const card = document.getElementById("node-" + editing);
+    const field = Array.from(
+      card?.querySelectorAll<HTMLTextAreaElement>("[data-edit-target]") || [],
+    ).find((element) => element.dataset.editTarget === snapshot.target);
+    if (field) focusAt(field, snapshot.offset, snapshot.clickY);
+    const scroll = card?.closest<HTMLElement>(".canvas-scroll");
+    if (scroll) {
+      scroll.scrollTop = snapshot.scrollTop;
+      scroll.scrollLeft = snapshot.scrollLeft;
+    }
+  }, [editing]);
   const [formName, setFormName] = useState(""),
     [formText, setFormText] = useState(""),
     [importType, setImportType] = useState("outline"),
@@ -302,6 +407,13 @@ export default function App() {
     importInput = useRef<HTMLInputElement>(null),
     pan = useRef<{ x: number; y: number; sx: number; sy: number } | null>(null),
     space = useRef(false);
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [panReady, setPanReady] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const draggedCanvas = useRef(false);
+  useEffect(() => {
+    setCanvasOffset({ x: 0, y: 0 });
+  }, [p?.id, view.chapter, view.part, view.all, workspaceTab]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -319,6 +431,10 @@ export default function App() {
     }
   };
   const change = (fn: (p: Project) => void) => {
+    if (handwritten) {
+      notify("Use Done on the writing page before changing other content.");
+      return;
+    }
     try {
       w.change(fn);
     } catch (e) {
@@ -326,16 +442,35 @@ export default function App() {
     }
   };
   const updateView = (patch: Partial<ViewState>) =>
-    setView((v) => ({ ...v, ...patch }));
+    setView((v) => ({
+      ...v,
+      ...patch,
+      ...(window.innerWidth <= 1100 && patch.left ? { right: false } : {}),
+      ...(window.innerWidth <= 1100 && patch.right ? { left: false } : {}),
+    }));
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 1100px)");
+    const reflow = () => {
+      if (narrow.matches) setView((v) => ({ ...v, left: false, right: false }));
+    };
+    narrow.addEventListener("change", reflow);
+    return () => narrow.removeEventListener("change", reflow);
+  }, []);
   async function refresh() {
     const all = await listProjects();
     setProjects(all);
     return all;
   }
   async function openProject(project: Project | null) {
+    if (handwritten) {
+      notify("Use Done on the writing page before switching projects.");
+      return;
+    }
     await w.open(project);
     setWorkspaceTab("outline");
     setPlanningSelection("");
+    setOrganizing(false);
+    setOrganizeSelection([]);
     if (project)
       setHiddenRecent((ids) => ids.filter((id) => id !== project.id));
     setEditing("");
@@ -351,8 +486,8 @@ export default function App() {
       const chapter = orderedChapters(project)[0]?.id || "";
       setView({
         ...initialView,
-        left: window.innerWidth > 760,
-        right: window.innerWidth > 760,
+        left: window.innerWidth > 1100,
+        right: window.innerWidth > 1100,
         chapter,
         selected: project.nodes.find((n) => n.chapterId === chapter)?.id || "",
         collapsed:
@@ -360,6 +495,7 @@ export default function App() {
             ? project.chapters.filter((c) => c.id !== chapter).map((c) => c.id)
             : [],
         ...saved,
+        ...(window.innerWidth <= 1100 ? { left: false, right: false } : {}),
       });
       localStorage.setItem("storytracks-last", project.id);
     } else {
@@ -387,6 +523,7 @@ export default function App() {
       );
       if (last) await openProject(last);
     }
+    if (needsTutorial()) setModal("tutorial");
     setLoading(false);
   }
   const booted = useRef(false);
@@ -407,11 +544,29 @@ export default function App() {
   }, [p?.id, workspaceTab]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (handwritten) return;
+      // Native dialogs own their keyboard interaction, including Space on buttons.
+      if ((e.target as HTMLElement).closest("dialog")) return;
       const input = (e.target as HTMLElement).closest(
         "input,textarea,[contenteditable]",
       );
-      if (e.code === "Space" && !input) {
+      if (
+        p &&
+        (e.ctrlKey || e.metaKey) &&
+        ["f", "h"].includes(e.key.toLowerCase()) &&
+        (!modal || modal === "find")
+      ) {
+        e.preventDefault();
+        setReplaceInitially(e.key.toLowerCase() === "h");
+        setModal("find");
+      }
+      if (
+        e.code === "Space" &&
+        !input &&
+        !(e.target as HTMLElement).closest("button,select")
+      ) {
         space.current = true;
+        setPanReady(true);
         e.preventDefault();
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !input) {
@@ -427,41 +582,67 @@ export default function App() {
         setMenu(false);
       }
     };
-    const up = () => (space.current = false);
+    const release = () => {
+      space.current = false;
+      pan.current = null;
+      setPanReady(false);
+      setPanning(false);
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.code === "Space") release();
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
+    window.addEventListener("blur", release);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", release);
     };
-  }, [w.undo, w.redo]);
+  }, [w.undo, w.redo, p, modal, handwritten]);
+  function zoomCanvas(percent: number, point?: { x: number; y: number }, fit = false) {
+    const el = canvas.current;
+    const surface = el?.querySelector<HTMLElement>(".canvas-zoom-surface");
+    const board = surface?.querySelector<HTMLElement>(".canvas-board");
+    if (!el || !surface || !board) return;
+    const previous = Number(surface.style.zoom) || 1;
+    const zoom = Math.max(25, Math.min(200, Math.round(percent)));
+    const next = zoom / 100;
+    if (next === previous && !fit) return;
+    const viewport = el.getBoundingClientRect();
+    const anchor = point ?? { x: viewport.left + el.clientWidth / 2, y: viewport.top + el.clientHeight / 2 };
+    const before = board.getBoundingClientRect();
+    const localX = (anchor.x - before.left) / previous;
+    const localY = (anchor.y - before.top) / previous;
+    surface.style.zoom = String(next);
+    surface.style.width = `${Math.max(100, zoom)}%`;
+    if (fit) {
+      setCanvasOffset({ x: 0, y: 0 });
+      el.scrollTo({ left: 0, top: 0 });
+    } else {
+      const after = board.getBoundingClientRect();
+      el.scrollLeft += after.left + localX * next - anchor.x;
+      el.scrollTop += after.top + localY * next - anchor.y;
+    }
+    setView((v) => ({ ...v, zoom, scroll: el.scrollTop }));
+  }
+  function fitCanvasWidth() {
+    const el = canvas.current;
+    const surface = el?.querySelector<HTMLElement>(".canvas-zoom-surface");
+    if (!el || !surface) return;
+    // Match the three-column breakpoint in typography.css.
+    const threeColumnWidth = 65 * parseFloat(getComputedStyle(surface).fontSize);
+    zoomCanvas(Math.min(100, Math.floor(((el.clientWidth - 2) * 100) / threeColumnWidth)), undefined, true);
+  }
   useEffect(() => {
     const el = canvas.current;
     if (!el) return;
     const wheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        const surface = el.querySelector<HTMLElement>(".canvas-board");
-        if (!surface) return;
-        const rect = surface.getBoundingClientRect();
-        const previous = Number(surface.style.zoom) || 1;
-        const next = Math.max(
-          0.25,
-          Math.min(2, previous + (e.deltaY < 0 ? 0.05 : -0.05)),
-        );
-        const localX = (e.clientX - rect.left) / previous;
-        const localY = (e.clientY - rect.top) / previous;
-        // Adjust after the zoom changes layout, including its centered margin.
-        surface.style.zoom = String(next);
-        const updated = surface.getBoundingClientRect();
-        el.scrollLeft += updated.left + localX * next - e.clientX;
-        el.scrollTop += updated.top + localY * next - e.clientY;
-        setView((v) => ({
-          ...v,
-          zoom: Math.round(next * 100),
-          scroll: el.scrollTop,
-        }));
-      }
+      if (!e.ctrlKey || !e.deltaY) return;
+      e.preventDefault();
+      const surface = el.querySelector<HTMLElement>(".canvas-zoom-surface");
+      const previous = (Number(surface?.style.zoom) || 1) * 100;
+      zoomCanvas(previous + (e.deltaY < 0 ? 5 : -5), { x: e.clientX, y: e.clientY });
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
@@ -469,17 +650,31 @@ export default function App() {
   const selected = p?.nodes.find((n) => n.id === view.selected),
     chapter =
       p?.chapters.find((c) => c.id === view.chapter) ||
-      (p ? orderedChapters(p)[0] : undefined);
+      (p
+        ? orderedChapters(p).find(
+            (c) => !view.part || c.sectionId === view.part,
+          )
+        : undefined);
   const locked = !!(p && selected && effective(p, selected, "locked"));
+  const focusedPart = p?.sections.find((s) => s.id === view.part && !s.trashed);
+  const annotationOwner =
+    (view.all ? p?.id : focusedPart?.id || chapter?.id) || p?.id || "";
+  const annotationItem = p && getItem(p, annotationOwner);
+  const annotationLocked = !!(
+    p &&
+    annotationItem &&
+    effective(p, annotationItem, "locked")
+  );
+  const handNode = p?.nodes.find((n) => n.id === handwritten);
   const nodes = p
     ? orderedNodes(p, showSuspended).filter(
         (n) =>
-          (view.all || n.chapterId === chapter?.id) &&
-          (!search ||
-            nodeTitle(p, n).toLowerCase().includes(search.toLowerCase()) ||
-            resolvedBlocks(p, n).some((b) =>
-              b.text.toLowerCase().includes(search.toLowerCase()),
-            )),
+          (view.all ||
+            (focusedPart
+              ? p.chapters.find((c) => c.id === n.chapterId)?.sectionId ===
+                focusedPart.id
+              : n.chapterId === chapter?.id)) &&
+          matchesSearch(p, n),
       )
     : [];
   const scopeId = p
@@ -491,8 +686,9 @@ export default function App() {
     : undefined;
   const note = p?.notes.find((n) => n.ownerId === scopeId && !n.canvasArea);
   function selectNode(n: StoryNode, focus = false) {
+    if (focus) setCanvasOffset({ x: 0, y: 0 });
     setWorkspaceTab("outline");
-    updateView({ selected: n.id, chapter: n.chapterId });
+    updateView({ selected: n.id, chapter: n.chapterId, part: "" });
     setTab("node");
     if (p && effective(p, n, "suspended")) setShowSuspended(true);
     if (focus) {
@@ -509,7 +705,7 @@ export default function App() {
       );
     }
   }
-  function addNode(after?: string) {
+  function addNode(after?: string, kind: StoryNode["kind"] = "beat") {
     if (!chapter || !p) return;
     let id = "";
     change((d) => {
@@ -519,6 +715,11 @@ export default function App() {
       const c = d.chapters.find((c) => c.id === targetChapter)!;
       assertEditable(d, c);
       const n = newNode(c.id);
+      n.kind = kind;
+      if (kind === "handwritten") {
+        n.title = "Hand written";
+        n.blocks = [];
+      }
       id = n.id;
       const index = after ? d.nodes.findIndex((n) => n.id === after) : -1;
       if (index >= 0) d.nodes.splice(index + 1, 0, n);
@@ -526,7 +727,11 @@ export default function App() {
     });
     if (id) {
       updateView({ selected: id });
-      setEditing(id);
+      if (kind === "handwritten") {
+        setEditing("");
+        setAnnotating(false);
+        setHandwritten(id);
+      } else setEditing(id);
       setTab("node");
       setTimeout(
         () =>
@@ -543,6 +748,66 @@ export default function App() {
       assertEditable(d, n);
       fn(n, d);
     });
+  }
+  function beginNodeEdit(
+    n: StoryNode,
+    event: ReactMouseEvent<HTMLElement>,
+    title = false,
+  ) {
+    if (handwritten) {
+      notify("Use Done on the current writing page first.");
+      return;
+    }
+    if (!p || effective(p, n, "locked") || n.templateId) return;
+    if (n.kind === "handwritten") {
+      setEditing("");
+      setAnnotating(false);
+      setHandwritten(n.id);
+      return;
+    }
+    const card = event.currentTarget.closest<HTMLElement>(".node-card")!;
+    const scroll = card.closest<HTMLElement>(".canvas-scroll")!;
+    const clicked = (event.target as HTMLElement).closest<HTMLElement>(
+      ".prose[data-block-id]",
+    );
+    const block =
+      n.blocks.find(
+        (b) => b.id === clicked?.dataset.blockId && b.type === "text",
+      ) || n.blocks.find((b) => b.type === "text");
+    const text = title
+      ? card.querySelector<HTMLElement>(".node-title-button")!
+      : clicked || card.querySelector<HTMLElement>(".prose")!;
+    const scale = view.zoom / 100;
+    const height = (element: HTMLElement) =>
+      element.getBoundingClientRect().height / scale;
+    editSnapshot.current = {
+      id: n.id,
+      titleHeight: height(
+        card.querySelector<HTMLElement>(".node-title-button h2")!,
+      ),
+      footerHeight: height(card.querySelector<HTMLElement>(".node-footer")!) || 48,
+      blocks: Object.fromEntries(
+        Array.from(card.querySelectorAll<HTMLElement>("[data-block-id]")).map(
+          (element) => [element.dataset.blockId!, height(element)],
+        ),
+      ),
+      target: title || !block ? "title" : block.id,
+      offset: text
+        ? clickedOffset(
+            text,
+            title ? n.title : block?.text || "",
+            event.clientX,
+            event.clientY,
+            !title,
+          )
+        : 0,
+      clickY: text
+        ? (event.clientY - text.getBoundingClientRect().top) / scale
+        : 0,
+      scrollTop: scroll.scrollTop,
+      scrollLeft: scroll.scrollLeft,
+    };
+    setEditing(n.id);
   }
   function dropNode(e: React.DragEvent, target: StoryNode) {
     e.preventDefault();
@@ -567,6 +832,10 @@ export default function App() {
     });
   }
   function startModal(type: Modal) {
+    if (handwritten) {
+      notify("Use Done on the writing page before opening another editor.");
+      return;
+    }
     if (type === "new") setProjectTemplate("");
     setFormName("");
     setFormText("");
@@ -615,38 +884,14 @@ export default function App() {
   }
   async function addMedia(file: File, resource = false) {
     if (!p) return;
-    const imageTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"],
-      audioTypes = [
-        "audio/mpeg",
-        "audio/wav",
-        "audio/x-wav",
-        "audio/ogg",
-        "audio/mp4",
-        "audio/webm",
-      ];
-    if (
-      !(
-        resource
-          ? [
-              ...imageTypes,
-              ...audioTypes,
-              "application/pdf",
-              "text/plain",
-              "text/markdown",
-            ]
-          : [...imageTypes, ...audioTypes]
-      ).includes(file.type)
-    )
-      throw new Error(
-        "Use PNG, JPG, WebP, GIF, MP3, WAV, OGG or M4A. Resources also accept PDF and text.",
-      );
+    const mediaType = attachmentType(file, resource);
     if (file.size > 25 * 1024 * 1024)
       throw new Error("Each attachment must be 25 MB or smaller.");
     const bytes = new Uint8Array(await file.arrayBuffer());
     const asset = {
       id: uid(),
       filename: file.name,
-      mediaType: file.type === "audio/x-wav" ? "audio/wav" : file.type,
+      mediaType,
       data: toBase64(bytes),
       hash: await hashBytes(bytes),
       size: file.size,
@@ -657,7 +902,7 @@ export default function App() {
           id: uid(),
           title: file.name,
           kind: "reference",
-          text: "",
+          text: mediaType.startsWith("text/") ? textAttachment(bytes) : "",
           source: file.name,
           createdAt: new Date().toISOString(),
           include: false,
@@ -671,7 +916,7 @@ export default function App() {
           throw new Error("Detach this placement before editing its media.");
         n.blocks.push({
           id: uid(),
-          type: file.type.startsWith("image/") ? "image" : "audio",
+          type: mediaType.startsWith("image/") ? "image" : "audio",
           assetId: asset.id,
           text: "",
           caption: "",
@@ -754,6 +999,51 @@ export default function App() {
       </div>
     );
   }
+  const desktopDownload = edition !== "desktop" && (
+    <a
+      className="button desktop-download"
+      href="/StoryTracks-setup.msi"
+      download="StoryTracks-setup.msi"
+      title="Download StoryTracks for Windows (.msi)"
+    >
+      <Download size={16} aria-hidden="true" />
+      Download for Windows
+    </a>
+  );
+  const settingsButton = (
+    <button
+      className="icon-button settings-button"
+      aria-label="Settings"
+      title="Settings"
+      aria-haspopup="dialog"
+      onClick={() => setModal("settings")}
+    >
+      <Settings size={20} />
+    </button>
+  );
+  const settingsDialog = modal === "settings" && (
+    <ModalShell
+      title="Settings"
+      subtitle="Make your writing desk comfortable."
+      onClose={() => setModal(null)}
+    >
+      {authenticated && (
+        <section
+          className="tutorial-settings"
+          aria-labelledby="tutorial-settings-heading"
+        >
+          <h3 id="tutorial-settings-heading">First-time tutorial</h3>
+          <p>
+            Learn how to navigate, arrange your writing desk, and set writing
+            guidance.
+          </p>
+          <button onClick={() => setModal("tutorial")}>Open tutorial</button>
+        </section>
+      )}
+      <ThemeSettings settings={themeSettings} />
+      <FontSettings settings={fontSettings} />
+    </ModalShell>
+  );
   if (loading)
     return (
       <div className="loading">
@@ -767,6 +1057,7 @@ export default function App() {
   if (!authenticated)
     return (
       <main className="login">
+        <div className="login-settings">{settingsButton}</div>
         <div className="brand">
           <Map /> StoryTracks
         </div>
@@ -794,11 +1085,46 @@ export default function App() {
             Open writing desk <ArrowRight size={16} />
           </button>
         </form>
+        {desktopDownload}
         {toast && <p role="alert">{toast}</p>}
+        {settingsDialog}
       </main>
     );
   return (
     <div className="app">
+      <SelectionToolbar
+        resolveReadingSelection={(selection) => {
+          if (!p || !selection.rangeCount) return null;
+          const range = selection.getRangeAt(0);
+          const element = (
+            range.startContainer.nodeType === Node.ELEMENT_NODE
+              ? (range.startContainer as Element)
+              : range.startContainer.parentElement
+          )?.closest<HTMLElement>(".prose[data-block-id]");
+          if (!element || !element.contains(range.endContainer)) return null;
+          const nodeId = element.closest(".track-step")?.id.slice(5);
+          const node = p.nodes.find((node) => node.id === nodeId);
+          if (!node || node.templateId || effective(p, node, "locked"))
+            return null;
+          const block = node.blocks.find(
+            (block) => block.id === element.dataset.blockId,
+          );
+          if (!block || block.type !== "text") return null;
+          const offsets = selectedSourceRange(element, block.text, range);
+          return offsets
+            ? {
+                text: block.text,
+                ...offsets,
+                rect: range.getBoundingClientRect(),
+                apply: (text) =>
+                  editNode(node.id, (draft) => {
+                    draft.blocks.find((item) => item.id === block.id)!.text =
+                      text;
+                  }),
+              }
+            : null;
+        }}
+      />
       <input
         hidden
         type="file"
@@ -917,14 +1243,14 @@ export default function App() {
             <div className="history-controls">
               <IconButton
                 label="Undo (Ctrl+Z)"
-                disabled={!w.canUndo}
+                disabled={!w.canUndo || !!handwritten}
                 onClick={w.undo}
               >
                 <Undo2 size={17} />
               </IconButton>
               <IconButton
                 label="Redo (Ctrl+Shift+Z)"
-                disabled={!w.canRedo}
+                disabled={!w.canRedo || !!handwritten}
                 onClick={w.redo}
               >
                 <Redo2 size={17} />
@@ -951,6 +1277,8 @@ export default function App() {
             Your private writing space
           </div>
         )}
+        {desktopDownload}
+        {settingsButton}
       </header>
       {p && w.error && (
         <div className="error-bar" role="alert">
@@ -1118,7 +1446,9 @@ export default function App() {
             }
           >
             {view.left && (
-              <aside className="outline-panel">
+              <aside
+                className={`outline-panel ${organizing && workspaceTab === "outline" ? "is-organizing" : ""}`}
+              >
                 <div className="panel-heading">
                   <div>
                     <span className="eyebrow">YOUR STORY, AT A GLANCE</span>
@@ -1186,8 +1516,73 @@ export default function App() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
-                      <kbd>⌕</kbd>
+                      {search ? (
+                        <IconButton
+                          label="Clear search"
+                          onClick={() => setSearch("")}
+                        >
+                          <X size={13} />
+                        </IconButton>
+                      ) : (
+                        <kbd>⌕</kbd>
+                      )}
                     </div>
+                    <div className="outline-utilities">
+                      <button
+                        className="button"
+                        onClick={() => {
+                          setReplaceInitially(false);
+                          setModal("find");
+                        }}
+                        title="Ctrl+F / Ctrl+H"
+                      >
+                        <Search size={14} /> Find
+                      </button>
+                      <button
+                        className={organizing ? "primary" : "button"}
+                        aria-pressed={organizing}
+                        onClick={() => {
+                          setOrganizing(!organizing);
+                          setOrganizeSelection([]);
+                        }}
+                      >
+                        {organizing ? "Done organizing" : "Organize"}
+                      </button>
+                    </div>
+                    {organizing && (
+                      <OutlineOrganizer
+                        project={p}
+                        kind={organizeKind}
+                        count={organizeSelection.length}
+                        setKind={(kind) => {
+                          setOrganizeKind(kind);
+                          setOrganizeSelection([]);
+                        }}
+                        clear={() => setOrganizeSelection([])}
+                        apply={(action, destination) => {
+                          try {
+                            w.change((d) => {
+                              organize(
+                                d,
+                                organizeKind,
+                                organizeSelection,
+                                action,
+                                destination,
+                              );
+                            });
+                            if (action === "move" || action === "copy")
+                              setOrganizeSelection([]);
+                            notify(
+                              action === "copy"
+                                ? "Selection copied. Undo is available."
+                                : "Outline updated. Undo is available.",
+                            );
+                          } catch (e) {
+                            notify((e as Error).message);
+                          }
+                        }}
+                      />
+                    )}
                     <div className="outline-tree">
                       {p.sections
                         .filter((s) => !s.trashed)
@@ -1197,8 +1592,44 @@ export default function App() {
                             key={s.id}
                           >
                             <div className="section-row">
+                              {organizing && organizeKind === "sections" && (
+                                <input
+                                  className="outline-check"
+                                  type="checkbox"
+                                  aria-label={`Select part ${s.title || "Untitled part"}`}
+                                  checked={organizeSelection.includes(s.id)}
+                                  onChange={() => toggleOrganize(s.id)}
+                                />
+                              )}
                               <button
                                 className="section-label"
+                                aria-pressed={view.part === s.id && !view.all}
+                                onClick={() => {
+                                  updateView({
+                                    part: s.id,
+                                    chapter:
+                                      orderedChapters(p, true).find(
+                                        (c) => c.sectionId === s.id,
+                                      )?.id || "",
+                                    all: false,
+                                    selected: "",
+                                    scroll: 0,
+                                    collapsed: view.collapsed.filter(
+                                      (id) => id !== s.id,
+                                    ),
+                                  });
+                                  if (canvas.current)
+                                    canvas.current.scrollTop = 0;
+                                }}
+                              >
+                                <span className="part-number">
+                                  {String(index + 1).padStart(2, "0")}
+                                </span>
+                                <span>{s.title}</span>
+                                {s.locked && <LockKeyhole size={12} />}
+                              </button>
+                              <IconButton
+                                label={`Toggle part ${s.title}`}
                                 onClick={() => toggleCollapse(s.id)}
                               >
                                 {view.collapsed.includes(s.id) ? (
@@ -1206,12 +1637,7 @@ export default function App() {
                                 ) : (
                                   <ChevronDown size={13} />
                                 )}
-                                <span className="part-number">
-                                  {String(index + 1).padStart(2, "0")}
-                                </span>
-                                <span>{s.title}</span>
-                                {s.locked && <LockKeyhole size={12} />}
-                              </button>
+                              </IconButton>
                               <IconButton
                                 label={`Settings for part ${s.title}`}
                                 onClick={() =>
@@ -1232,7 +1658,11 @@ export default function App() {
                                     assertEditable(d, section);
                                     const c = newChapter(s.id);
                                     d.chapters.push(c);
-                                    updateView({ chapter: c.id, selected: "" });
+                                    updateView({
+                                      chapter: c.id,
+                                      selected: "",
+                                      part: "",
+                                    });
                                     setTab("chapter");
                                   })
                                 }
@@ -1271,10 +1701,25 @@ export default function App() {
                                     <div
                                       className={`chapter-row ${chapter?.id === c.id ? "current" : ""}`}
                                     >
+                                      {organizing &&
+                                        organizeKind === "chapters" && (
+                                          <input
+                                            className="outline-check"
+                                            type="checkbox"
+                                            aria-label={`Select chapter ${c.title || "Untitled chapter"}`}
+                                            checked={organizeSelection.includes(
+                                              c.id,
+                                            )}
+                                            onChange={() =>
+                                              toggleOrganize(c.id)
+                                            }
+                                          />
+                                        )}
                                       <button
                                         onClick={() => {
                                           updateView({
                                             chapter: c.id,
+                                            part: "",
                                             selected:
                                               p.nodes.find(
                                                 (n) =>
@@ -1293,13 +1738,15 @@ export default function App() {
                                         <span className="chapter-num">
                                           {chapterLabel(p, c).padStart(2, "0")}
                                         </span>
-                                        <span>{c.title}</span>
+                                        <span>
+                                          {c.title || "Untitled chapter"}
+                                        </span>
                                         {effective(p, c, "locked") && (
                                           <LockKeyhole size={11} />
                                         )}
                                       </button>
                                       <IconButton
-                                        label={`Toggle ${c.title}`}
+                                        label={`Toggle ${c.title || "Untitled chapter"}`}
                                         onClick={() => toggleCollapse(c.id)}
                                       >
                                         {view.collapsed.includes(c.id) ? (
@@ -1317,12 +1764,7 @@ export default function App() {
                                             !effective(p, n, "trashed") &&
                                             (!effective(p, n, "suspended") ||
                                               showSuspended) &&
-                                            (!search ||
-                                              nodeTitle(p, n)
-                                                .toLowerCase()
-                                                .includes(
-                                                  search.toLowerCase(),
-                                                )),
+                                            matchesSearch(p, n),
                                         )
                                         .map((n) => (
                                           <div
@@ -1386,6 +1828,24 @@ export default function App() {
                                                 });
                                             }}
                                           >
+                                            {organizing &&
+                                              organizeKind === "nodes" && (
+                                                <input
+                                                  className="outline-check"
+                                                  type="checkbox"
+                                                  aria-label={`Select node ${nodeTitle(p, n)}`}
+                                                  checked={organizeSelection.includes(
+                                                    n.id,
+                                                  )}
+                                                  onChange={() => {}}
+                                                  onClick={(e) =>
+                                                    toggleOrganize(
+                                                      n.id,
+                                                      e.shiftKey,
+                                                    )
+                                                  }
+                                                />
+                                              )}
                                             <button
                                               onClick={() => selectNode(n)}
                                             >
@@ -1497,11 +1957,21 @@ export default function App() {
                       <span className="eyebrow">THE WRITING DESK</span>
                       <span className="toolbar-divider" />
                       <button
-                        className={view.all ? "" : "selected-filter"}
-                        onClick={() => updateView({ all: false })}
+                        className={
+                          !view.all && !focusedPart ? "selected-filter" : ""
+                        }
+                        onClick={() => updateView({ all: false, part: "" })}
                       >
                         Chapter
                       </button>
+                      {focusedPart && (
+                        <button
+                          className={!view.all ? "selected-filter" : ""}
+                          onClick={() => updateView({ all: false })}
+                        >
+                          Part
+                        </button>
+                      )}
                       <button
                         className={view.all ? "selected-filter" : ""}
                         onClick={() => updateView({ all: true })}
@@ -1510,6 +1980,30 @@ export default function App() {
                       </button>
                     </div>
                     <div className="view-controls">
+                      <button
+                        className="button"
+                        aria-pressed={annotating}
+                        disabled={annotationLocked || !!handwritten}
+                        onClick={() => {
+                          setAnnotating(!annotating);
+                          setShowAnnotations(true);
+                        }}
+                      >
+                        Hand annotation
+                      </button>
+                      <IconButton
+                        label={
+                          showAnnotations
+                            ? "Hide annotations"
+                            : "Show annotations"
+                        }
+                        onClick={() => {
+                          setShowAnnotations(!showAnnotations);
+                          setAnnotating(false);
+                        }}
+                      >
+                        <Eye size={15} />
+                      </IconButton>
                       <IconButton
                         label="Canvas view"
                         active={!listView}
@@ -1535,264 +2029,339 @@ export default function App() {
                     </div>
                   </div>
                   <div
-                    className="canvas-scroll"
+                    className={`canvas-scroll ${panReady ? "pan-ready" : ""} ${panning ? "is-panning" : ""}`}
                     ref={canvas}
                     onScroll={(e) => {
                       const scroll = e.currentTarget.scrollTop;
                       setView((v) => ({ ...v, scroll }));
                     }}
-                    onPointerDown={(e) => {
+                    onPointerDownCapture={(e) => {
+                      draggedCanvas.current = false;
                       if (
                         e.button === 1 ||
                         (space.current &&
                           !(e.target as HTMLElement).closest(
-                            "input,textarea,button",
+                            "input,textarea,select,[contenteditable]",
                           ))
                       ) {
                         e.preventDefault();
+                        e.stopPropagation();
+                        setPanning(true);
                         e.currentTarget.setPointerCapture(e.pointerId);
                         pan.current = {
                           x: e.clientX,
                           y: e.clientY,
-                          sx: e.currentTarget.scrollLeft,
-                          sy: e.currentTarget.scrollTop,
+                          sx: canvasOffset.x,
+                          sy: canvasOffset.y,
                         };
                       }
                     }}
                     onPointerMove={(e) => {
                       if (pan.current) {
-                        e.currentTarget.scrollLeft =
-                          pan.current.sx - (e.clientX - pan.current.x);
-                        e.currentTarget.scrollTop =
-                          pan.current.sy - (e.clientY - pan.current.y);
+                        const dx = e.clientX - pan.current.x;
+                        const dy = e.clientY - pan.current.y;
+                        if (Math.abs(dx) + Math.abs(dy) > 3)
+                          draggedCanvas.current = true;
+                        setCanvasOffset({
+                          x: pan.current.sx + dx,
+                          y: pan.current.sy + dy,
+                        });
                       }
                     }}
-                    onPointerUp={() => (pan.current = null)}
+                    onPointerUp={(e) => {
+                      pan.current = null;
+                      setPanning(false);
+                      if (e.currentTarget.hasPointerCapture(e.pointerId))
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                    }}
+                    onPointerCancel={() => {
+                      pan.current = null;
+                      setPanning(false);
+                    }}
+                    onLostPointerCapture={() => {
+                      pan.current = null;
+                      setPanning(false);
+                    }}
+                    onClickCapture={(e) => {
+                      if (draggedCanvas.current) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        draggedCanvas.current = false;
+                      }
+                    }}
                   >
                     <div
-                      className="canvas-board"
-                      style={{ zoom: view.zoom / 100 } as CSSProperties}
+                      className="canvas-pan-surface"
+                      style={{
+                        position: "relative",
+                        left: canvasOffset.x,
+                        top: canvasOffset.y,
+                      }}
                     >
-                      <CanvasArea
-                        project={p}
-                        area="subcontext"
-                        selected={selected}
-                        selectNode={selectNode}
-                        change={change}
-                      />
-                      <div
-                        className={`story-canvas ${listView ? "compact" : ""}`}
-                      >
-                        <div className="main-area-label eyebrow">
-                          02 / MAIN STORY
-                        </div>
-                        <div className="chapter-intro">
-                          <div className="chapter-kicker">
-                            <span />{" "}
-                            {view.all
-                              ? "THE COMPLETE STORY"
-                              : `CHAPTER ${chapter ? chapterLabel(p, chapter).padStart(2, "0") : "01"}`}{" "}
-                            <span />
+                      <div className="canvas-zoom-surface" style={{ zoom: view.zoom / 100, width: `${Math.max(100, view.zoom)}%` }}>
+                      <div className={`canvas-board ${listView ? "compact-board" : ""} ${!view.subcontext ? "context-collapsed" : ""} ${!view.highlight ? "highlight-collapsed" : ""}`}>
+                        <CanvasArea
+                          project={p}
+                          area="subcontext"
+                          collapsed={!view.subcontext}
+                          onToggle={() =>
+                            updateView({ subcontext: !view.subcontext })
+                          }
+                          selected={selected}
+                          selectNode={selectNode}
+                          change={change}
+                        />
+                        <div
+                          className={`story-canvas ${listView ? "compact" : ""}`}
+                        >
+                          <div className="main-area-label eyebrow">
+                            02 / MAIN STORY
                           </div>
-                          <h1>
-                            {view.all
-                              ? p.name
-                              : chapter?.title || "A new beginning"}
-                          </h1>
-                          <p>
-                            {view.all
-                              ? p.description
-                              : chapter?.metadata.summary ||
-                                "Every scene is a step. See where the story takes you."}
-                          </p>
-                          <div className="chapter-details">
-                            <span>
-                              <Layers size={12} />
-                              {nodes.length} nodes
-                            </span>
-                            <span>·</span>
-                            <span>
-                              {wordCount(p, nodes).toLocaleString()} words
-                            </span>
-                            <span>·</span>
-                            <span className="mood-dot" />
-                            {chapter
-                              ? effectiveMetadata(p, chapter).pacing ||
-                                "Your pace"
-                              : "Your story"}
+                          <div className="chapter-intro">
+                            <div className="chapter-kicker">
+                              <span />{" "}
+                              {view.all
+                                ? "THE COMPLETE STORY"
+                                : focusedPart
+                                  ? "PART"
+                                  : `CHAPTER ${chapter ? chapterLabel(p, chapter).padStart(2, "0") : "01"}`}{" "}
+                              <span />
+                            </div>
+                            <h1>
+                              {view.all
+                                ? p.name
+                                : focusedPart?.title ||
+                                  chapter?.title ||
+                                  "A new beginning"}
+                            </h1>
+                            <p>
+                              {view.all
+                                ? p.description
+                                : chapter?.metadata.summary ||
+                                  "Every scene is a step. See where the story takes you."}
+                            </p>
+                            <div className="chapter-details">
+                              <span>
+                                <Layers size={12} />
+                                {nodes.length} nodes
+                              </span>
+                              <span>·</span>
+                              <span>
+                                {wordCount(p, nodes).toLocaleString()} words
+                              </span>
+                              <span>·</span>
+                              <span className="mood-dot" />
+                              {chapter
+                                ? effectiveMetadata(p, chapter).pacing ||
+                                  "Your pace"
+                                : "Your story"}
+                            </div>
                           </div>
-                        </div>
-                        <div className="track">
-                          {nodes.map((n, index) => {
-                            const KindIcon = icons[n.kind],
-                              isSelected = view.selected === n.id,
-                              blocks = resolvedBlocks(p, n),
-                              isLocked = effective(p, n, "locked");
-                            return (
-                              <VirtualStep
-                                id={"node-" + n.id}
-                                className={`track-step ${isSelected ? "is-selected" : ""}`}
-                                key={n.id}
-                                estimatedHeight={listView ? 170 : 280}
-                                initial={index < 5}
-                                pinned={isSelected || editing === n.id}
-                              >
-                                {() => (
-                                  <>
-                                    <div className="track-marker">
-                                      <span>
-                                        {String(index + 1).padStart(2, "0")}
-                                      </span>
-                                    </div>
-                                    {view.all &&
-                                      (index === 0 ||
-                                        nodes[index - 1].chapterId !==
-                                          n.chapterId) && (
-                                        <div className="track-chapter-label">
-                                          Chapter{" "}
-                                          {chapterLabel(
-                                            p,
-                                            p.chapters.find(
-                                              (c) => c.id === n.chapterId,
-                                            )!,
-                                          )}{" "}
-                                          ·{" "}
-                                          {
-                                            p.chapters.find(
-                                              (c) => c.id === n.chapterId,
-                                            )?.title
-                                          }
-                                        </div>
-                                      )}
-                                    <article
-                                      className={`node-card ${isSelected ? "selected" : ""} ${effective(p, n, "suspended") ? "is-suspended" : ""}`}
-                                      onClick={() => selectNode(n)}
-                                      onDragOver={(e) => {
-                                        if (
-                                          e.dataTransfer.types.includes(
-                                            "text/storytracks-node",
+                          <div className="track">
+                            {nodes.map((n, index) => {
+                              const KindIcon = icons[n.kind],
+                                isSelected = view.selected === n.id,
+                                blocks = resolvedBlocks(p, n),
+                                isLocked = effective(p, n, "locked");
+                              const compactPreview = listView && !isSelected && editing !== n.id;
+                              const previewBlock = compactPreview ? blocks.find((b) => b.type === "text" && b.text.trim()) : undefined;
+                              const visibleBlocks = compactPreview ? (previewBlock ? [previewBlock] : []) : blocks;
+                              return (
+                                <VirtualStep
+                                  id={"node-" + n.id}
+                                  className={`track-step ${isSelected ? "is-selected" : ""}`}
+                                  key={n.id}
+                                  estimatedHeight={compactPreview ? 95 : 280}
+                                  initial={index < 5}
+                                  pinned={isSelected || editing === n.id}
+                                >
+                                  {() => (
+                                    <>
+                                      <div className="track-marker">
+                                        <span>
+                                          {String(index + 1).padStart(2, "0")}
+                                        </span>
+                                      </div>
+                                      {(view.all || focusedPart) &&
+                                        (index === 0 ||
+                                          nodes[index - 1].chapterId !==
+                                            n.chapterId) && (
+                                          <div className="track-chapter-label">
+                                            Chapter{" "}
+                                            {chapterLabel(
+                                              p,
+                                              p.chapters.find(
+                                                (c) => c.id === n.chapterId,
+                                              )!,
+                                            )}{" "}
+                                            ·{" "}
+                                            {
+                                              p.chapters.find(
+                                                (c) => c.id === n.chapterId,
+                                              )?.title
+                                            }
+                                          </div>
+                                        )}
+                                      <article
+                                        className={`node-card ${compactPreview ? "compact-preview" : ""} ${isSelected ? "selected" : ""} ${editing === n.id ? "is-editing" : ""} ${effective(p, n, "suspended") ? "is-suspended" : ""}`}
+                                        style={
+                                          editing === n.id &&
+                                          editSnapshot.current?.id === n.id
+                                            ? ({
+                                                "--editing-footer-height": `${editSnapshot.current.footerHeight}px`,
+                                              } as CSSProperties)
+                                            : undefined
+                                        }
+                                        onClick={() => selectNode(n)}
+                                        onDragOver={(e) => {
+                                          if (
+                                            e.dataTransfer.types.includes(
+                                              "text/storytracks-node",
+                                            )
                                           )
-                                        )
-                                          e.preventDefault();
-                                      }}
-                                      onDrop={(e) => dropNode(e, n)}
-                                    >
-                                      <header className="node-card-header">
-                                        <div className={`node-type ${n.kind}`}>
-                                          <KindIcon size={12} />
-                                          {n.kind === "turn"
-                                            ? "TURNING POINT"
-                                            : n.kind.toUpperCase()}
-                                          {n.templateId && <Link2 size={12} />}
-                                        </div>
-                                        <div className="node-card-actions">
-                                          {isLocked && (
-                                            <LockKeyhole size={12} />
-                                          )}
-                                          <span
-                                            className="grip"
-                                            draggable={!isLocked}
-                                            aria-label="Drag node to reorder"
-                                            title="Drag onto a node to move before it"
-                                            onDragStart={(e) =>
-                                              e.dataTransfer.setData(
-                                                "text/storytracks-node",
-                                                n.id,
-                                              )
-                                            }
+                                            e.preventDefault();
+                                        }}
+                                        onDrop={(e) => dropNode(e, n)}
+                                      >
+                                        <header className="node-card-header">
+                                          <div
+                                            className={`node-type ${n.kind}`}
                                           >
-                                            <GripVertical size={15} />
-                                          </span>
-                                          <IconButton
-                                            label={`Settings for ${nodeTitle(p, n)}`}
-                                            onClick={() => {
-                                              selectNode(n);
-                                              setTab("node");
-                                              updateView({ right: true });
-                                            }}
-                                          >
-                                            <Settings2 size={14} />
-                                          </IconButton>
-                                        </div>
-                                      </header>
-                                      {editing === n.id &&
-                                      !isLocked &&
-                                      !n.templateId ? (
-                                        <div className="node-edit">
-                                          <input
-                                            className="node-title-input"
-                                            aria-label="Node title"
-                                            placeholder="Give this moment a name…"
-                                            value={n.title}
-                                            onChange={(e) =>
-                                              editNode(
-                                                n.id,
-                                                (x) =>
-                                                  (x.title = e.target.value),
-                                              )
-                                            }
-                                            autoFocus
-                                          />
-                                          {blocks.map((b, bi) => (
-                                            <div
-                                              className="block-editor"
-                                              key={b.id}
+                                            <KindIcon size={12} />
+                                            {n.kind === "handwritten"
+                                              ? "HAND WRITTEN"
+                                              : n.kind === "turn"
+                                                ? "TURNING POINT"
+                                                : n.kind.toUpperCase()}
+                                            {n.templateId && (
+                                              <Link2 size={12} />
+                                            )}
+                                          </div>
+                                          <div className="node-card-actions">
+                                            {isLocked && (
+                                              <LockKeyhole size={12} />
+                                            )}
+                                            <span
+                                              className="grip"
+                                              draggable={!isLocked}
+                                              aria-label="Drag node to reorder"
+                                              title="Drag onto a node to move before it"
+                                              onDragStart={(e) =>
+                                                e.dataTransfer.setData(
+                                                  "text/storytracks-node",
+                                                  n.id,
+                                                )
+                                              }
                                             >
-                                              {b.type === "text" ? (
-                                                <textarea
-                                                  aria-label={`Content block ${bi + 1}`}
-                                                  placeholder="What happens in this moment?"
-                                                  value={b.text}
-                                                  onChange={(e) =>
-                                                    editNode(
-                                                      n.id,
-                                                      (x) =>
-                                                        (x.blocks.find(
-                                                          (y) => y.id === b.id,
-                                                        )!.text =
-                                                          e.target.value),
-                                                    )
-                                                  }
-                                                  onPaste={(e) => {
-                                                    const file = Array.from(
-                                                      e.clipboardData.files,
-                                                    ).find((f) =>
-                                                      f.type.startsWith(
-                                                        "image/",
-                                                      ),
-                                                    );
-                                                    if (file) {
-                                                      e.preventDefault();
-                                                      void run(() =>
-                                                        addMedia(file),
-                                                      );
+                                              <GripVertical size={15} />
+                                            </span>
+                                            <IconButton
+                                              label={`Settings for ${nodeTitle(p, n)}`}
+                                              onClick={() => {
+                                                selectNode(n);
+                                                setTab("node");
+                                                updateView({ right: true });
+                                              }}
+                                            >
+                                              <Settings2 size={14} />
+                                            </IconButton>
+                                          </div>
+                                        </header>
+                                        {n.kind !== "handwritten" &&
+                                        editing === n.id &&
+                                        !isLocked &&
+                                        !n.templateId ? (
+                                          <div className="node-edit node-body">
+                                            <NodeTextField
+                                              className="node-title-input"
+                                              data-edit-target="title"
+                                              rows={1}
+                                              initialHeight={
+                                                editSnapshot.current?.id ===
+                                                n.id
+                                                  ? editSnapshot.current
+                                                      .titleHeight
+                                                  : undefined
+                                              }
+                                              aria-label="Node title"
+                                              placeholder="Give this moment a name…"
+                                              value={n.title}
+                                              onChange={(e) =>
+                                                editNode(
+                                                  n.id,
+                                                  (x) =>
+                                                    (x.title = e.target.value),
+                                                )
+                                              }
+                                              autoFocus={
+                                                editSnapshot.current?.id !==
+                                                n.id
+                                              }
+                                            />
+                                            {blocks.map((b, bi) => (
+                                              <div
+                                                className={`block-editor ${b.type === "text" ? "text-block-editor" : ""}`}
+                                                key={b.id}
+                                                style={
+                                                  b.type !== "text" &&
+                                                  editSnapshot.current?.id ===
+                                                    n.id
+                                                    ? {
+                                                        height:
+                                                          editSnapshot.current
+                                                            .blocks[b.id],
+                                                        overflow: "auto",
+                                                      }
+                                                    : undefined
+                                                }
+                                              >
+                                                {b.type === "text" ? (
+                                                  <NodeTextField
+                                                    className="node-text-input"
+                                                    data-edit-target={b.id}
+                                                    initialHeight={
+                                                      editSnapshot.current
+                                                        ?.id === n.id
+                                                        ? editSnapshot.current
+                                                            .blocks[b.id]
+                                                        : undefined
                                                     }
-                                                  }}
-                                                />
-                                              ) : (
-                                                <>
-                                                  <MediaBlock p={p} b={b} />
-                                                  <input
-                                                    aria-label="Media caption"
-                                                    placeholder="Caption"
-                                                    value={b.caption}
-                                                    onChange={(e) =>
+                                                    aria-label={`Content block ${bi + 1}`}
+                                                    placeholder="What happens in this moment?"
+                                                    value={b.text}
+                                                    onValueChange={(value) =>
                                                       editNode(
                                                         n.id,
                                                         (x) =>
                                                           (x.blocks.find(
                                                             (y) =>
                                                               y.id === b.id,
-                                                          )!.caption =
-                                                            e.target.value),
+                                                          )!.text = value),
                                                       )
                                                     }
+                                                    onPaste={(e) => {
+                                                      const file = Array.from(
+                                                        e.clipboardData.files,
+                                                      ).find((f) =>
+                                                        f.type.startsWith(
+                                                          "image/",
+                                                        ),
+                                                      );
+                                                      if (file) {
+                                                        e.preventDefault();
+                                                        void run(() =>
+                                                          addMedia(file),
+                                                        );
+                                                      }
+                                                    }}
                                                   />
-                                                  {b.type === "image" && (
+                                                ) : (
+                                                  <>
+                                                    <MediaBlock p={p} b={b} />
                                                     <input
-                                                      aria-label="Alternative text"
-                                                      placeholder="Describe the image"
-                                                      value={b.alt}
+                                                      aria-label="Media caption"
+                                                      placeholder="Caption"
+                                                      value={b.caption}
                                                       onChange={(e) =>
                                                         editNode(
                                                           n.id,
@@ -1800,283 +2369,362 @@ export default function App() {
                                                             (x.blocks.find(
                                                               (y) =>
                                                                 y.id === b.id,
-                                                            )!.alt =
+                                                            )!.caption =
                                                               e.target.value),
                                                         )
                                                       }
                                                     />
-                                                  )}
-                                                  {b.type === "audio" && (
-                                                    <textarea
-                                                      aria-label="Audio transcript"
-                                                      placeholder="Optional transcript"
-                                                      value={b.text}
-                                                      onChange={(e) =>
-                                                        editNode(n.id, (x) => {
-                                                          x.blocks.find(
-                                                            (y) =>
-                                                              y.id === b.id,
-                                                          )!.text =
-                                                            e.target.value;
-                                                        })
-                                                      }
-                                                    />
-                                                  )}
-                                                </>
-                                              )}
-                                              <div className="block-tools">
-                                                <IconButton
-                                                  label="Move block up"
-                                                  disabled={bi === 0}
-                                                  onClick={() =>
-                                                    editNode(n.id, (x) => {
-                                                      [
-                                                        x.blocks[bi - 1],
-                                                        x.blocks[bi],
-                                                      ] = [
-                                                        x.blocks[bi],
-                                                        x.blocks[bi - 1],
-                                                      ];
-                                                    })
-                                                  }
-                                                >
-                                                  <ArrowUp size={12} />
-                                                </IconButton>
-                                                <IconButton
-                                                  label="Move block down"
-                                                  disabled={
-                                                    bi === blocks.length - 1
-                                                  }
-                                                  onClick={() =>
-                                                    editNode(n.id, (x) => {
-                                                      [
-                                                        x.blocks[bi + 1],
-                                                        x.blocks[bi],
-                                                      ] = [
-                                                        x.blocks[bi],
-                                                        x.blocks[bi + 1],
-                                                      ];
-                                                    })
-                                                  }
-                                                >
-                                                  <ArrowDown size={12} />
-                                                </IconButton>
-                                                <IconButton
-                                                  label="Remove content block"
-                                                  onClick={() =>
-                                                    editNode(
-                                                      n.id,
-                                                      (x) =>
-                                                        (x.blocks =
-                                                          x.blocks.filter(
-                                                            (y) =>
-                                                              y.id !== b.id,
-                                                          )),
-                                                    )
-                                                  }
-                                                >
-                                                  <X size={12} />
-                                                </IconButton>
-                                              </div>
-                                            </div>
-                                          ))}
-                                          <div className="edit-toolbar">
-                                            <button
-                                              className="text-button"
-                                              onClick={() =>
-                                                editNode(n.id, (x) =>
-                                                  x.blocks.push(textBlock()),
-                                                )
-                                              }
-                                            >
-                                              <Plus size={13} />
-                                              Text
-                                            </button>
-                                            <button
-                                              className="text-button"
-                                              onClick={() =>
-                                                mediaInput.current?.click()
-                                              }
-                                            >
-                                              <ImagePlus size={13} />
-                                              Media
-                                            </button>
-                                            <button
-                                              className="primary tiny"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditing("");
-                                              }}
-                                            >
-                                              Done
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div
-                                          className="node-body"
-                                          onDoubleClick={() => {
-                                            if (!isLocked && !n.templateId)
-                                              setEditing(n.id);
-                                          }}
-                                        >
-                                          <button
-                                            className="node-title-button"
-                                            onClick={() => {
-                                              if (!isLocked && !n.templateId)
-                                                setEditing(n.id);
-                                            }}
-                                          >
-                                            <h2>{nodeTitle(p, n)}</h2>
-                                          </button>
-                                          {blocks.length ? (
-                                            blocks.map((b) =>
-                                              b.type === "text" ? (
-                                                <div
-                                                  className="prose"
-                                                  key={b.id}
-                                                >
-                                                  {b.text ? (
-                                                    <ReactMarkdown
-                                                      skipHtml
-                                                      components={{
-                                                        img: () => null,
-                                                        a: ({ children }) => (
-                                                          <span>
-                                                            {children}
-                                                          </span>
-                                                        ),
-                                                      }}
-                                                    >
-                                                      {b.text}
-                                                    </ReactMarkdown>
-                                                  ) : (
-                                                    <p className="placeholder">
-                                                      Double-click to begin
-                                                      writing…
-                                                    </p>
-                                                  )}
+                                                    {b.type === "image" && (
+                                                      <input
+                                                        aria-label="Alternative text"
+                                                        placeholder="Describe the image"
+                                                        value={b.alt}
+                                                        onChange={(e) =>
+                                                          editNode(
+                                                            n.id,
+                                                            (x) =>
+                                                              (x.blocks.find(
+                                                                (y) =>
+                                                                  y.id === b.id,
+                                                              )!.alt =
+                                                                e.target.value),
+                                                          )
+                                                        }
+                                                      />
+                                                    )}
+                                                    {b.type === "audio" && (
+                                                      <FormattedTextarea
+                                                        aria-label="Audio transcript"
+                                                        placeholder="Optional transcript"
+                                                        value={b.text}
+                                                        onValueChange={(
+                                                          value,
+                                                        ) =>
+                                                          editNode(
+                                                            n.id,
+                                                            (x) => {
+                                                              x.blocks.find(
+                                                                (y) =>
+                                                                  y.id === b.id,
+                                                              )!.text = value;
+                                                            },
+                                                          )
+                                                        }
+                                                      />
+                                                    )}
+                                                  </>
+                                                )}
+                                                <div className="block-tools">
+                                                  <IconButton
+                                                    label="Move block up"
+                                                    disabled={bi === 0}
+                                                    onClick={() =>
+                                                      editNode(n.id, (x) => {
+                                                        [
+                                                          x.blocks[bi - 1],
+                                                          x.blocks[bi],
+                                                        ] = [
+                                                          x.blocks[bi],
+                                                          x.blocks[bi - 1],
+                                                        ];
+                                                      })
+                                                    }
+                                                  >
+                                                    <ArrowUp size={12} />
+                                                  </IconButton>
+                                                  <IconButton
+                                                    label="Move block down"
+                                                    disabled={
+                                                      bi === blocks.length - 1
+                                                    }
+                                                    onClick={() =>
+                                                      editNode(n.id, (x) => {
+                                                        [
+                                                          x.blocks[bi + 1],
+                                                          x.blocks[bi],
+                                                        ] = [
+                                                          x.blocks[bi],
+                                                          x.blocks[bi + 1],
+                                                        ];
+                                                      })
+                                                    }
+                                                  >
+                                                    <ArrowDown size={12} />
+                                                  </IconButton>
+                                                  <IconButton
+                                                    label="Remove content block"
+                                                    onClick={() =>
+                                                      editNode(
+                                                        n.id,
+                                                        (x) =>
+                                                          (x.blocks =
+                                                            x.blocks.filter(
+                                                              (y) =>
+                                                                y.id !== b.id,
+                                                            )),
+                                                      )
+                                                    }
+                                                  >
+                                                    <X size={12} />
+                                                  </IconButton>
                                                 </div>
-                                              ) : (
-                                                <MediaBlock
-                                                  p={p}
-                                                  b={b}
-                                                  key={b.id}
-                                                />
-                                              ),
-                                            )
-                                          ) : (
-                                            <p className="placeholder">
-                                              Add a thought, a scene, a
-                                              possibility.
-                                            </p>
-                                          )}
-                                        </div>
-                                      )}
-                                      <footer className="node-footer">
-                                        <div>
-                                          <span
-                                            className="weight-dots"
-                                            title={`Importance ${(n.importance / 2).toFixed(1)} of 5.5`}
-                                          >
-                                            {[2, 4, 6, 8, 10].map((v) => (
-                                              <i
-                                                className={
-                                                  n.importance >= v
-                                                    ? "filled"
-                                                    : ""
-                                                }
-                                                key={v}
-                                              />
+                                              </div>
                                             ))}
+                                            <div className="edit-toolbar">
+                                              <button
+                                                className="text-button"
+                                                onClick={() =>
+                                                  editNode(n.id, (x) =>
+                                                    x.blocks.push(textBlock()),
+                                                  )
+                                                }
+                                              >
+                                                <Plus size={13} />
+                                                Text
+                                              </button>
+                                              <button
+                                                className="text-button"
+                                                onClick={() =>
+                                                  mediaInput.current?.click()
+                                                }
+                                              >
+                                                <ImagePlus size={13} />
+                                                Media
+                                              </button>
+                                              <button
+                                                className="primary tiny"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setEditing("");
+                                                }}
+                                              >
+                                                Done
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div
+                                            className="node-body"
+                                            onDoubleClick={(e) =>
+                                              beginNodeEdit(n, e)
+                                            }
+                                          >
+                                            <button
+                                              className="node-title-button"
+                                              onClick={(e) =>
+                                                beginNodeEdit(n, e, true)
+                                              }
+                                            >
+                                              <h2>{nodeTitle(p, n)}</h2>
+                                            </button>
+                                            {n.kind === "handwritten" && !compactPreview && (
+                                              <button
+                                                className={
+                                                  blocks.some((b) => b.drawing)
+                                                    ? "button"
+                                                    : "handwritten-open"
+                                                }
+                                                disabled={
+                                                  isLocked || !!n.templateId
+                                                }
+                                                onClick={(e) =>
+                                                  beginNodeEdit(n, e)
+                                                }
+                                              >
+                                                Open writing page
+                                              </button>
+                                            )}
+                                            {visibleBlocks.length ? (
+                                              visibleBlocks.map((b) =>
+                                                b.type === "text" ? (
+                                                  <div
+                                                    className="prose"
+                                                    data-block-id={b.id}
+                                                    key={b.id}
+                                                  >
+                                                    {b.text ? (
+                                                      <ReactMarkdown
+                                                        skipHtml
+                                                        remarkPlugins={[
+                                                          remarkGfm,
+                                                          inlineFormatting,
+                                                        ]}
+                                                        rehypePlugins={[
+                                                          sourcePositions,
+                                                        ]}
+                                                        components={
+                                                          nodeMarkdownComponents
+                                                        }
+                                                      >
+                                                        {b.text}
+                                                      </ReactMarkdown>
+                                                    ) : (
+                                                      <p className="placeholder">
+                                                        Double-click to begin
+                                                        writing…
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                ) : (
+                                                  <div
+                                                    data-block-id={b.id}
+                                                    key={b.id}
+                                                  >
+                                                    <MediaBlock p={p} b={b} />
+                                                  </div>
+                                                ),
+                                              )
+                                            ) : !compactPreview ? (
+                                              <p className="placeholder">
+                                                Add a thought, a scene, a
+                                                possibility.
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                        )}
+                                        <footer className="node-footer">
+                                          <div>
+                                            <span
+                                              className="weight-dots"
+                                              title={`Importance ${(n.importance / 2).toFixed(1)} of 5.5`}
+                                            >
+                                              {[2, 4, 6, 8, 10].map((v) => (
+                                                <i
+                                                  className={
+                                                    n.importance >= v
+                                                      ? "filled"
+                                                      : ""
+                                                  }
+                                                  key={v}
+                                                />
+                                              ))}
+                                            </span>
+                                            <span>
+                                              Importance{" "}
+                                              <b>
+                                                {(n.importance / 2).toFixed(1)}
+                                              </b>
+                                            </span>
+                                            <span className="footer-separator" />
+                                            <span>
+                                              Liberty{" "}
+                                              <b>
+                                                {(n.liberty / 2).toFixed(1)}
+                                              </b>
+                                            </span>
+                                          </div>
+                                          <span className="transition-label">
+                                            {sharpness(n.ending)} exit{" "}
+                                            <ArrowRight size={12} />
                                           </span>
-                                          <span>
-                                            Importance{" "}
-                                            <b>
-                                              {(n.importance / 2).toFixed(1)}
-                                            </b>
-                                          </span>
-                                          <span className="footer-separator" />
-                                          <span>
-                                            Liberty{" "}
-                                            <b>{(n.liberty / 2).toFixed(1)}</b>
-                                          </span>
-                                        </div>
-                                        <span className="transition-label">
-                                          {sharpness(n.ending)} exit{" "}
-                                          <ArrowRight size={12} />
-                                        </span>
-                                      </footer>
-                                    </article>
-                                    <button
-                                      className="insert-node"
-                                      aria-label={`Insert node after ${nodeTitle(p, n)}`}
-                                      onClick={() => addNode(n.id)}
-                                    >
-                                      <Plus size={13} />
-                                    </button>
-                                  </>
+                                        </footer>
+                                      </article>
+                                      <button
+                                        className="insert-node"
+                                        aria-label={`Insert node after ${nodeTitle(p, n)}`}
+                                        onClick={() => addNode(n.id)}
+                                      >
+                                        <Plus size={13} />
+                                      </button>
+                                    </>
+                                  )}
+                                </VirtualStep>
+                              );
+                            })}
+                            {!nodes.length && (
+                              <div className="empty-canvas">
+                                <span className="empty-icon">
+                                  <FileText size={30} />
+                                </span>
+                                <h2>
+                                  {search
+                                    ? "No matching moments"
+                                    : "A blank page, a thousand possibilities."}
+                                </h2>
+                                <p>
+                                  {search
+                                    ? "Try a different word or clear your search."
+                                    : "Start with a scene, a feeling, or a single line."}
+                                </p>
+                                {search ? (
+                                  <button
+                                    className="button"
+                                    onClick={() => setSearch("")}
+                                  >
+                                    Clear search
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="primary"
+                                    disabled={!chapter}
+                                    onClick={() => addNode()}
+                                  >
+                                    <Plus size={16} />
+                                    Create your first node
+                                  </button>
                                 )}
-                              </VirtualStep>
-                            );
-                          })}
-                          {!nodes.length && (
-                            <div className="empty-canvas">
-                              <span className="empty-icon">
-                                <FileText size={30} />
-                              </span>
-                              <h2>
-                                {search
-                                  ? "No matching moments"
-                                  : "A blank page, a thousand possibilities."}
-                              </h2>
-                              <p>
-                                {search
-                                  ? "Try a different word or clear your search."
-                                  : "Start with a scene, a feeling, or a single line."}
-                              </p>
-                              {search ? (
-                                <button
-                                  className="button"
-                                  onClick={() => setSearch("")}
-                                >
-                                  Clear search
-                                </button>
-                              ) : (
-                                <button
-                                  className="primary"
-                                  disabled={!chapter}
-                                  onClick={() => addNode()}
-                                >
-                                  <Plus size={16} />
-                                  Create your first node
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          {!!nodes.length && (
-                            <button
-                              className="add-node-bottom"
-                              onClick={() => addNode()}
-                            >
-                              <Plus size={17} />
-                              <span>Add the next moment</span>
-                              <kbd>+</kbd>
-                            </button>
-                          )}
+                              </div>
+                            )}
+                            {!!nodes.length && (
+                              <button
+                                className="add-node-bottom"
+                                onClick={() => addNode()}
+                              >
+                                <Plus size={17} />
+                                <span>Add the next moment</span>
+                                <kbd>+</kbd>
+                              </button>
+                            )}
+                          </div>
+                          <div className="canvas-end">
+                            <span /> A STORY TAKES SHAPE, ONE MOMENT AT A TIME{" "}
+                            <span />
+                          </div>
                         </div>
-                        <div className="canvas-end">
-                          <span /> A STORY TAKES SHAPE, ONE MOMENT AT A TIME{" "}
-                          <span />
-                        </div>
+                        <CanvasArea
+                          project={p}
+                          area="highlight"
+                          collapsed={!view.highlight}
+                          onToggle={() =>
+                            updateView({ highlight: !view.highlight })
+                          }
+                          selected={selected}
+                          selectNode={selectNode}
+                          change={change}
+                        />
+                        {showAnnotations && (
+                          <Annotations
+                            key={p.id + annotationOwner}
+                            viewport={canvas}
+                            page={
+                              p.annotations?.find(
+                                (a) => a.ownerId === annotationOwner,
+                              )?.drawing || blankPage()
+                            }
+                            active={
+                              annotating && !annotationLocked && !handwritten
+                            }
+                            onDone={() => setAnnotating(false)}
+                            onChange={(drawing) =>
+                              change((d) => {
+                                const owner = getItem(d, annotationOwner);
+                                if (owner) assertEditable(d, owner);
+                                d.annotations ||= [];
+                                const layer = d.annotations.find(
+                                  (a) => a.ownerId === annotationOwner,
+                                );
+                                if (layer) layer.drawing = drawing;
+                                else
+                                  d.annotations.push({
+                                    ownerId: annotationOwner,
+                                    drawing,
+                                  });
+                              })
+                            }
+                          />
+                        )}
                       </div>
-                      <CanvasArea
-                        project={p}
-                        area="highlight"
-                        selected={selected}
-                        selectNode={selectNode}
-                        change={change}
-                      />
+                      </div>
                     </div>
                   </div>
                   <div className="canvas-bottom">
@@ -2091,30 +2739,39 @@ export default function App() {
                     <div className="zoom-controls">
                       <IconButton
                         label="Zoom out"
-                        onClick={() =>
-                          updateView({ zoom: Math.max(25, view.zoom - 10) })
-                        }
+                        onClick={() => zoomCanvas(view.zoom - 10)}
                       >
                         <ZoomOut size={15} />
                       </IconButton>
                       <button
-                        onClick={() => updateView({ zoom: 100 })}
+                        onClick={() => zoomCanvas(100)}
                         title="Reset zoom"
                       >
                         {view.zoom}%
                       </button>
                       <IconButton
                         label="Zoom in"
-                        onClick={() =>
-                          updateView({ zoom: Math.min(200, view.zoom + 10) })
-                        }
+                        onClick={() => zoomCanvas(view.zoom + 10)}
                       >
                         <ZoomIn size={15} />
                       </IconButton>
+                      <IconButton label="Fit canvas width" onClick={fitCanvasWidth}>
+                        <Scan size={15} />
+                      </IconButton>
                       <span className="toolbar-divider" />
+                      <IconButton
+                        label="Reset canvas position"
+                        onClick={() => {
+                          setCanvasOffset({ x: 0, y: 0 });
+                          canvas.current?.scrollTo({ left: 0, top: 0 });
+                        }}
+                      >
+                        <Map size={14} />
+                      </IconButton>
                       <IconButton
                         label="Fit selected node"
                         onClick={() => {
+                          setCanvasOffset({ x: 0, y: 0 });
                           if (selected) selectNode(selected, true);
                           else updateView({ zoom: 100 });
                         }}
@@ -2198,213 +2855,256 @@ export default function App() {
                   {tab === "node" &&
                     (selected ? (
                       <>
-                        <div className="inspector-node-label">
-                          <span className={`node-dot ${selected.kind}`} />
-                          {selected.kind === "turn"
-                            ? "TURNING POINT"
-                            : selected.kind.toUpperCase()}
-                          <span>
-                            #
-                            {String(
-                              orderedNodes(p, true).findIndex(
-                                (n) => n.id === selected.id,
-                              ) + 1,
-                            ).padStart(2, "0")}
-                          </span>
-                        </div>
-                        <h3 className="inspector-title">
-                          {nodeTitle(p, selected)}
-                        </h3>
-                        <p className="inspector-description">
-                          A little intention gives every moment a purpose.
-                        </p>
-                        {selected.templateId && (
-                          <div className="linked-notice">
-                            <Link2 size={15} />
-                            Linked template
-                            <button
-                              onClick={() => {
-                                setTemplateEdit(selected.templateId!);
-                                setModal("template");
+                        <section
+                          className="inspector-section"
+                          aria-label="Node overview"
+                        >
+                          <div className="inspector-node-label">
+                            <span className={`node-dot ${selected.kind}`} />
+                            {selected.kind === "handwritten"
+                              ? "HAND WRITTEN"
+                              : selected.kind === "turn"
+                                ? "TURNING POINT"
+                                : selected.kind.toUpperCase()}
+                            <span>
+                              #
+                              {String(
+                                orderedNodes(p, true).findIndex(
+                                  (n) => n.id === selected.id,
+                                ) + 1,
+                              ).padStart(2, "0")}
+                            </span>
+                          </div>
+                          <h3 className="inspector-title">
+                            {nodeTitle(p, selected)}
+                          </h3>
+                          <p className="inspector-description">
+                            A little intention gives every moment a purpose.
+                          </p>
+                          {selected.templateId && (
+                            <div className="linked-notice">
+                              <Link2 size={15} />
+                              Linked template
+                              <button
+                                onClick={() => {
+                                  setTemplateEdit(selected.templateId!);
+                                  setModal("template");
+                                }}
+                              >
+                                Edit template
+                              </button>
+                              <button
+                                onClick={() =>
+                                  change((d) =>
+                                    detach(
+                                      d,
+                                      d.nodes.find(
+                                        (n) => n.id === selected.id,
+                                      )!,
+                                    ),
+                                  )
+                                }
+                              >
+                                Detach & edit
+                              </button>
+                            </div>
+                          )}
+                          <Field label="Node type">
+                            <select
+                              value={selected.kind}
+                              disabled={locked || !!handwritten}
+                              onChange={(e) => {
+                                editNode(
+                                  selected.id,
+                                  (n) =>
+                                    (n.kind = e.target
+                                      .value as StoryNode["kind"]),
+                                );
+                                if (
+                                  e.target.value === "handwritten" &&
+                                  !selected.templateId
+                                ) {
+                                  setEditing("");
+                                  setAnnotating(false);
+                                  setHandwritten(selected.id);
+                                }
                               }}
                             >
-                              Edit template
-                            </button>
+                              <option value="beat">Story beat</option>
+                              <option value="scene">Scene</option>
+                              <option value="turn">Turning point</option>
+                              <option value="note">Note</option>
+                              <option
+                                value="handwritten"
+                                disabled={!!selected.templateId}
+                              >
+                                Hand written
+                              </option>
+                            </select>
+                          </Field>
+                        </section>
+                        <section
+                          className="inspector-section"
+                          aria-label="Narrative weight"
+                        >
+                          <div className="inspector-section-head">
+                            <Settings2 size={14} />
+                            <h4>NARRATIVE WEIGHT</h4>
                             <button
                               onClick={() =>
-                                change((d) =>
-                                  detach(
-                                    d,
-                                    d.nodes.find((n) => n.id === selected.id)!,
+                                editNode(selected.id, (n) =>
+                                  Object.assign(
+                                    n,
+                                    Object.fromEntries(
+                                      Object.keys(defaults).map((k) => [
+                                        k,
+                                        (p.templates.find(
+                                          (t) => t.id === n.templateId,
+                                        ) ?? defaults)[
+                                          k as keyof typeof defaults
+                                        ],
+                                      ]),
+                                    ),
                                   ),
                                 )
                               }
+                              disabled={locked}
                             >
-                              Detach & edit
+                              Reset
                             </button>
                           </div>
-                        )}
-                        <Field label="Node type">
-                          <select
-                            value={selected.kind}
+                          <Weight
+                            label="Importance"
+                            value={selected.importance / 2}
+                            min={1}
+                            max={5.5}
+                            step={0.5}
+                            hint="How much does this moment matter?"
+                            low="Supporting"
+                            high="Essential"
                             disabled={locked}
-                            onChange={(e) =>
+                            onChange={(v) =>
                               editNode(
                                 selected.id,
-                                (n) =>
-                                  (n.kind = e.target
-                                    .value as StoryNode["kind"]),
+                                (n) => (n.importance = Math.round(v * 2)),
                               )
                             }
-                          >
-                            <option value="beat">Story beat</option>
-                            <option value="scene">Scene</option>
-                            <option value="turn">Turning point</option>
-                            <option value="note">Note</option>
-                          </select>
-                        </Field>
-                        <div className="inspector-section-head">
-                          <Settings2 size={14} />
-                          <h4>NARRATIVE WEIGHT</h4>
-                          <button
-                            onClick={() =>
-                              editNode(selected.id, (n) =>
-                                Object.assign(
-                                  n,
-                                  Object.fromEntries(
-                                    Object.keys(defaults).map((k) => [
-                                      k,
-                                      (p.templates.find(
-                                        (t) => t.id === n.templateId,
-                                      ) ?? defaults)[
-                                        k as keyof typeof defaults
-                                      ],
-                                    ]),
-                                  ),
-                                ),
+                          />
+                          <Weight
+                            label="Creative liberty"
+                            value={selected.liberty / 2}
+                            min={1}
+                            max={5.5}
+                            step={0.5}
+                            hint="How much room is there to reimagine it?"
+                            low="Stay faithful"
+                            high="Explore freely"
+                            disabled={locked}
+                            onChange={(v) =>
+                              editNode(
+                                selected.id,
+                                (n) => (n.liberty = Math.round(v * 2)),
                               )
                             }
+                          />
+                        </section>
+                        <section
+                          className="inspector-section"
+                          aria-label="Transitions"
+                        >
+                          <div className="inspector-section-head">
+                            <AudioLines size={14} />
+                            <h4>TRANSITIONS</h4>
+                          </div>
+                          <Weight
+                            label="Beginning"
+                            value={selected.beginning}
+                            min={0}
+                            max={100}
+                            step={1}
+                            hint="The way we enter this moment."
+                            low="Gradual"
+                            high="Sharp"
                             disabled={locked}
-                          >
-                            Reset
-                          </button>
-                        </div>
-                        <Weight
-                          label="Importance"
-                          value={selected.importance / 2}
-                          min={1}
-                          max={5.5}
-                          step={0.5}
-                          hint="How much does this moment matter?"
-                          low="Supporting"
-                          high="Essential"
-                          disabled={locked}
-                          onChange={(v) =>
-                            editNode(
-                              selected.id,
-                              (n) => (n.importance = Math.round(v * 2)),
-                            )
-                          }
-                        />
-                        <Weight
-                          label="Creative liberty"
-                          value={selected.liberty / 2}
-                          min={1}
-                          max={5.5}
-                          step={0.5}
-                          hint="How much room is there to reimagine it?"
-                          low="Stay faithful"
-                          high="Explore freely"
-                          disabled={locked}
-                          onChange={(v) =>
-                            editNode(
-                              selected.id,
-                              (n) => (n.liberty = Math.round(v * 2)),
-                            )
-                          }
-                        />
-                        <div className="inspector-section-head">
-                          <AudioLines size={14} />
-                          <h4>TRANSITIONS</h4>
-                        </div>
-                        <Weight
-                          label="Beginning"
-                          value={selected.beginning}
-                          min={0}
-                          max={100}
-                          step={1}
-                          hint="The way we enter this moment."
-                          low="Gradual"
-                          high="Sharp"
-                          disabled={locked}
-                          onChange={(v) =>
-                            editNode(selected.id, (n) => (n.beginning = v))
-                          }
-                        />
-                        <Weight
-                          label="Ending"
-                          value={selected.ending}
-                          min={0}
-                          max={100}
-                          step={1}
-                          hint="The feeling we leave behind."
-                          low="Gradual"
-                          high="Sharp"
-                          disabled={locked}
-                          onChange={(v) =>
-                            editNode(selected.id, (n) => (n.ending = v))
-                          }
-                        />
-                        <div className="node-actions-grid">
-                          <button
-                            className="button"
-                            disabled={locked || !!selected.templateId}
-                            onClick={() => {
-                              setEditing(selected.id);
-                              selectNode(selected, true);
-                            }}
-                          >
-                            <FileText size={14} />
-                            Edit content
-                          </button>
-                          <button
-                            className="button"
-                            disabled={locked}
-                            onClick={() => {
-                              setFormName(nodeTitle(p, selected));
-                              setTemplateEdit("");
-                              setModal("template");
-                            }}
-                          >
-                            <Copy size={14} />
-                            Save template
-                          </button>
-                        </div>
-                        <Field label="Move to chapter">
-                          <select
-                            value={selected.chapterId}
-                            disabled={locked}
-                            onChange={(e) =>
-                              change((d) => {
-                                moveItem(d, selected.id, 0, e.target.value);
-                                updateView({ chapter: e.target.value });
-                              })
+                            onChange={(v) =>
+                              editNode(selected.id, (n) => (n.beginning = v))
                             }
-                          >
-                            {orderedChapters(p, true).map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {chapterLabel(p, c)} · {c.title}
-                              </option>
-                            ))}
-                          </select>
-                        </Field>
-                        {itemActions(selected)}
-                        <div className="small-note">
-                          <LockKeyhole size={13} />
-                          {locked
-                            ? "Locked. Unlock the item or its parent to edit."
-                            : "Weights are writing guidance, not inclusion rules."}
-                        </div>
+                          />
+                          <Weight
+                            label="Ending"
+                            value={selected.ending}
+                            min={0}
+                            max={100}
+                            step={1}
+                            hint="The feeling we leave behind."
+                            low="Gradual"
+                            high="Sharp"
+                            disabled={locked}
+                            onChange={(v) =>
+                              editNode(selected.id, (n) => (n.ending = v))
+                            }
+                          />
+                        </section>
+                        <section
+                          className="inspector-section"
+                          aria-label="Node actions"
+                        >
+                          <div className="node-actions-grid">
+                            <button
+                              className="button"
+                              disabled={
+                                locked || !!selected.templateId || !!handwritten
+                              }
+                              onClick={() => {
+                                if (selected.kind === "handwritten") {
+                                  setAnnotating(false);
+                                  setHandwritten(selected.id);
+                                } else setEditing(selected.id);
+                                selectNode(selected, true);
+                              }}
+                            >
+                              <FileText size={14} />
+                              Edit content
+                            </button>
+                            <button
+                              className="button"
+                              disabled={locked}
+                              onClick={() => {
+                                setFormName(nodeTitle(p, selected));
+                                setTemplateEdit("");
+                                setModal("template");
+                              }}
+                            >
+                              <Copy size={14} />
+                              Save template
+                            </button>
+                          </div>
+                          <Field label="Move to chapter">
+                            <select
+                              value={selected.chapterId}
+                              disabled={locked}
+                              onChange={(e) =>
+                                change((d) => {
+                                  moveItem(d, selected.id, 0, e.target.value);
+                                  updateView({ chapter: e.target.value });
+                                })
+                              }
+                            >
+                              {orderedChapters(p, true).map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {chapterLabel(p, c)} · {c.title}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                          {itemActions(selected)}
+                          <div className="small-note">
+                            <LockKeyhole size={13} />
+                            {locked
+                              ? "Locked. Unlock the item or its parent to edit."
+                              : "Weights are writing guidance, not inclusion rules."}
+                          </div>
+                        </section>
                       </>
                     ) : (
                       <div className="empty-panel">
@@ -2421,110 +3121,118 @@ export default function App() {
                         <p>Create a chapter in the outline.</p>
                       ) : (
                         <>
-                          <div className="eyebrow">
-                            {tab === "project"
-                              ? "THE BIG PICTURE"
-                              : `CHAPTER ${chapterLabel(p, chapter!)}`}
-                          </div>
-                          <h3 className="inspector-title">
-                            {tab === "project"
-                              ? "Your story’s compass"
-                              : chapter!.title}
-                          </h3>
-                          <p className="inspector-description">
-                            {tab === "project"
-                              ? "Set the voice and feeling of your book."
-                              : "Leave fields inherited, or give this chapter its own voice."}
-                          </p>
-                          <Field
-                            label={
+                          <section
+                            className="inspector-section"
+                            aria-label={
                               tab === "project"
-                                ? "Project name"
-                                : "Chapter title"
+                                ? "Project overview"
+                                : "Chapter overview"
                             }
                           >
-                            <input
-                              value={
-                                tab === "project" ? p.name : chapter!.title
+                            <div className="eyebrow">
+                              {tab === "project"
+                                ? "THE BIG PICTURE"
+                                : `CHAPTER ${chapterLabel(p, chapter!)}`}
+                            </div>
+                            <h3 className="inspector-title">
+                              {tab === "project"
+                                ? "Your story’s compass"
+                                : chapter!.title}
+                            </h3>
+                            <p className="inspector-description">
+                              {tab === "project"
+                                ? "Set the voice and feeling of your book."
+                                : "Leave fields inherited, or give this chapter its own voice."}
+                            </p>
+                            <Field
+                              label={
+                                tab === "project"
+                                  ? "Project name"
+                                  : "Chapter title"
                               }
-                              disabled={
-                                tab === "chapter" &&
-                                effective(p, chapter!, "locked")
-                              }
-                              onChange={(e) =>
-                                change((d) => {
-                                  if (tab === "project") {
-                                    if (e.target.value) d.name = e.target.value;
-                                  } else {
-                                    const c = d.chapters.find(
-                                      (c) => c.id === chapter!.id,
-                                    )!;
-                                    assertEditable(d, c);
-                                    c.title = e.target.value;
-                                  }
-                                })
-                              }
-                            />
-                          </Field>
-                          {tab === "project" ? (
-                            <Field label="Logline / description">
-                              <textarea
-                                value={p.description}
+                            >
+                              <input
+                                value={
+                                  tab === "project" ? p.name : chapter!.title
+                                }
+                                disabled={
+                                  tab === "chapter" &&
+                                  effective(p, chapter!, "locked")
+                                }
                                 onChange={(e) =>
-                                  change(
-                                    (d) => (d.description = e.target.value),
-                                  )
+                                  change((d) => {
+                                    if (tab === "project") {
+                                      if (e.target.value)
+                                        d.name = e.target.value;
+                                    } else {
+                                      const c = d.chapters.find(
+                                        (c) => c.id === chapter!.id,
+                                      )!;
+                                      assertEditable(d, c);
+                                      c.title = e.target.value;
+                                    }
+                                  })
                                 }
                               />
                             </Field>
-                          ) : (
-                            <>
-                              <Field
-                                label="Chapter number"
-                                hint="Leave blank for automatic numbering."
-                              >
-                                <input
-                                  value={chapter!.manualLabel ?? ""}
-                                  disabled={effective(p, chapter!, "locked")}
-                                  placeholder={chapterLabel(p, chapter!)}
-                                  onChange={(e) =>
-                                    change((d) => {
-                                      const c = d.chapters.find(
-                                        (c) => c.id === chapter!.id,
-                                      )!;
-                                      assertEditable(d, c);
-                                      c.manualLabel = e.target.value || null;
-                                    })
+                            {tab === "project" ? (
+                              <Field label="Logline / description">
+                                <FormattedTextarea
+                                  value={p.description}
+                                  onValueChange={(value) =>
+                                    change((d) => (d.description = value))
                                   }
                                 />
                               </Field>
-                              {chapter!.manualLabel &&
-                                p.chapters.some(
-                                  (c) =>
-                                    c.id !== chapter!.id &&
-                                    c.manualLabel === chapter!.manualLabel,
-                                ) && (
-                                  <p className="warning">
-                                    Another chapter uses this label.
-                                  </p>
-                                )}
-                              <Field label="Chapter purpose">
-                                <textarea
-                                  value={chapter!.metadata.summary || ""}
-                                  disabled={effective(p, chapter!, "locked")}
-                                  onChange={(e) =>
-                                    change((d) => {
-                                      const c = d.chapters.find(
-                                        (c) => c.id === chapter!.id,
-                                      )!;
-                                      assertEditable(d, c);
-                                      c.metadata.summary = e.target.value;
-                                    })
-                                  }
-                                />
-                              </Field>
-                            </>
-                          )}
+                            ) : (
+                              <>
+                                <Field
+                                  label="Chapter number"
+                                  hint="Leave blank for automatic numbering."
+                                >
+                                  <input
+                                    value={chapter!.manualLabel ?? ""}
+                                    disabled={effective(p, chapter!, "locked")}
+                                    placeholder={chapterLabel(p, chapter!)}
+                                    onChange={(e) =>
+                                      change((d) => {
+                                        const c = d.chapters.find(
+                                          (c) => c.id === chapter!.id,
+                                        )!;
+                                        assertEditable(d, c);
+                                        c.manualLabel = e.target.value || null;
+                                      })
+                                    }
+                                  />
+                                </Field>
+                                {chapter!.manualLabel &&
+                                  p.chapters.some(
+                                    (c) =>
+                                      c.id !== chapter!.id &&
+                                      c.manualLabel === chapter!.manualLabel,
+                                  ) && (
+                                    <p className="warning">
+                                      Another chapter uses this label.
+                                    </p>
+                                  )}
+                                <Field label="Chapter purpose">
+                                  <FormattedTextarea
+                                    value={chapter!.metadata.summary || ""}
+                                    disabled={effective(p, chapter!, "locked")}
+                                    onValueChange={(value) =>
+                                      change((d) => {
+                                        const c = d.chapters.find(
+                                          (c) => c.id === chapter!.id,
+                                        )!;
+                                        assertEditable(d, c);
+                                        c.metadata.summary = value;
+                                      })
+                                    }
+                                  />
+                                </Field>
+                              </>
+                            )}
+                          </section>
                           {metadataFields
                             .filter(
                               (k) =>
@@ -2543,7 +3251,11 @@ export default function App() {
                                     : chapter!.metadata,
                                 inherited = tab === "chapter" && !(k in meta);
                               return (
-                                <div className="metadata-field" key={k}>
+                                <section
+                                  className="metadata-field inspector-section"
+                                  aria-label={metadataLabels[k]}
+                                  key={k}
+                                >
                                   <Field
                                     label={metadataLabels[k]}
                                     hint={
@@ -2553,7 +3265,7 @@ export default function App() {
                                     }
                                   >
                                     {k === "instructions" ? (
-                                      <textarea
+                                      <FormattedTextarea
                                         value={meta[k] ?? ""}
                                         placeholder={
                                           inherited
@@ -2565,16 +3277,16 @@ export default function App() {
                                           tab === "chapter" &&
                                           effective(p, chapter!, "locked")
                                         }
-                                        onChange={(e) =>
+                                        onValueChange={(value) =>
                                           change((d) => {
                                             if (tab === "project")
-                                              d.metadata[k] = e.target.value;
+                                              d.metadata[k] = value;
                                             else {
                                               const c = d.chapters.find(
                                                 (c) => c.id === chapter!.id,
                                               )!;
                                               assertEditable(d, c);
-                                              c.metadata[k] = e.target.value;
+                                              c.metadata[k] = value;
                                             }
                                           })
                                         }
@@ -2624,7 +3336,7 @@ export default function App() {
                                       Use project value
                                     </button>
                                   )}
-                                </div>
+                                </section>
                               );
                             })}
                           {tab === "chapter" && (
@@ -2681,12 +3393,12 @@ export default function App() {
                           </option>
                         </select>
                       </Field>
-                      <textarea
+                      <FormattedTextarea
                         className="notes-editor"
                         aria-label="Side note"
                         placeholder="Keep a thought close…"
                         value={note?.text || ""}
-                        onChange={(e) =>
+                        onValueChange={(value) =>
                           change((d) => {
                             if (!scopeId) return;
                             const owner = getItem(d, scopeId);
@@ -2694,12 +3406,12 @@ export default function App() {
                             const existing = d.notes.find(
                               (n) => n.ownerId === scopeId && !n.canvasArea,
                             );
-                            if (existing) existing.text = e.target.value;
+                            if (existing) existing.text = value;
                             else
                               d.notes.push({
                                 id: uid(),
                                 ownerId: scopeId,
-                                text: e.target.value,
+                                text: value,
                                 include: false,
                               });
                           })
@@ -2911,7 +3623,17 @@ export default function App() {
                               onClick={() => {
                                 setResourceId(r.id);
                                 setFormName(r.title);
-                                setFormText(r.text);
+                                const attached = p.assets.find(
+                                  (a) => a.id === r.assetId,
+                                );
+                                setFormText(
+                                  r.text ||
+                                    (attached?.mediaType.startsWith("text/")
+                                      ? textAttachment(
+                                          fromBase64(attached.data),
+                                        )
+                                      : ""),
+                                );
                                 setModal("resource");
                               }}
                             >
@@ -2932,14 +3654,7 @@ export default function App() {
                                   const a = p.assets.find(
                                     (a) => a.id === r.assetId,
                                   )!;
-                                  await deliver({
-                                    filename: a.filename,
-                                    blob: await (
-                                      await fetch(
-                                        `data:${a.mediaType};base64,${a.data}`,
-                                      )
-                                    ).blob(),
-                                  });
+                                  await deliver(await attachmentDownload(a));
                                 })
                               }
                             >
@@ -3019,6 +3734,62 @@ export default function App() {
           </IconButton>
         </div>
       )}
+      {settingsDialog}
+      {p && handNode && (
+        <HandwritingEditor
+          key={p.id + handNode.id}
+          title={handNode.title}
+          initial={handNode.blocks.find((b) => b.drawing)?.drawing}
+          saveStatus={w.status}
+          onTitle={(title) => {
+            try {
+              w.change((d) => {
+                const n = d.nodes.find((n) => n.id === handNode.id)!;
+                assertEditable(d, n);
+                n.title = title;
+              });
+            } catch (error) {
+              notify((error as Error).message);
+            }
+          }}
+          onSave={async (drawing) => {
+            const asset = await drawingAsset(drawing);
+            if (w.ref.current?.id !== p.id)
+              throw new Error(
+                "The project changed before this drawing could be saved.",
+              );
+            w.change((d) => saveDrawing(d, handNode.id, drawing, asset));
+          }}
+          onDone={async () => {
+            await w.flush();
+            setHandwritten("");
+          }}
+        />
+      )}
+      {modal === "find" && p && (
+        <ModalShell
+          title="Find / Replace"
+          subtitle="Search your words and make deliberate changes."
+          onClose={() => setModal(null)}
+          wide
+        >
+          <FindReplace
+            project={p}
+            query={search}
+            setQuery={setSearch}
+            within={view.all ? "" : focusedPart?.id || chapter?.id || ""}
+            replaceInitially={replaceInitially}
+            change={change}
+            reveal={(id) => {
+              const node = p.nodes.find((n) => n.id === id);
+              if (node) {
+                setModal(null);
+                selectNode(node, true);
+              }
+            }}
+          />
+        </ModalShell>
+      )}
       {modal === "archiveConflict" && archiveConflict && (
         <ModalShell
           title="This story is already on your desk."
@@ -3087,10 +3858,10 @@ export default function App() {
               />
             </Field>
             <Field label="A line about your story (optional)">
-              <textarea
+              <FormattedTextarea
                 placeholder="What is waiting to be told?"
                 value={formText}
-                onChange={(e) => setFormText(e.target.value)}
+                onValueChange={(value) => setFormText(value)}
               />
             </Field>
             <Field label="Project template">
@@ -3381,6 +4152,10 @@ export default function App() {
                           d.chapters = d.chapters.filter((x) => !ids.has(x.id));
                           d.nodes = d.nodes.filter((x) => !ids.has(x.id));
                           d.notes = d.notes.filter((x) => !ids.has(x.ownerId));
+                          if (d.annotations)
+                            d.annotations = d.annotations.filter(
+                              (x) => !ids.has(x.ownerId),
+                            );
                         });
                     }}
                   >
@@ -3416,10 +4191,10 @@ export default function App() {
             />
           </Field>
           <Field label="Content">
-            <textarea
+            <FormattedTextarea
               className="template-text"
               value={formText}
-              onChange={(e) => setFormText(e.target.value)}
+              onValueChange={(value) => setFormText(value)}
             />
           </Field>
           <div className="modal-footer">
@@ -3438,6 +4213,15 @@ export default function App() {
             </button>
           </div>
         </ModalShell>
+      )}
+      {modal === "tutorial" && (
+        <Tutorial
+          onClose={(outcome) => {
+            if (!rememberTutorial(outcome))
+              notify("Tutorial preference couldn’t be saved on this device.");
+            setModal(null);
+          }}
+        />
       )}
       {modal === "help" && (
         <ModalShell
@@ -3615,6 +4399,7 @@ function PublishModal({
   publish: () => void;
   backup: () => void;
 }) {
+  const [formatted, setFormatted] = useState(true);
   let out;
   try {
     out = publication(p, includeSuspended);
@@ -3681,7 +4466,58 @@ function PublishModal({
       </label>
       <details className="export-preview">
         <summary>Preview the storytrack</summary>
-        <pre>{out.markdown}</pre>
+        <div className="preview-switch" role="group" aria-label="Preview view">
+          <button
+            type="button"
+            className={formatted ? "selected-filter" : ""}
+            aria-pressed={formatted}
+            onClick={() => setFormatted(true)}
+          >
+            Formatted
+          </button>
+          <button
+            type="button"
+            className={!formatted ? "selected-filter" : ""}
+            aria-pressed={!formatted}
+            onClick={() => setFormatted(false)}
+          >
+            Plain text
+          </button>
+        </div>
+        {formatted ? (
+          <div className="publication-formatted">
+            <details className="publication-metadata">
+              <summary>Snapshot metadata</summary>
+              <pre>
+                {out.markdown.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/)?.[1]}
+              </pre>
+            </details>
+            <ReactMarkdown
+              skipHtml
+              remarkPlugins={[remarkGfm, inlineFormatting]}
+              components={{
+                a: ({ children }) => <span>{children}</span>,
+                img: ({ src, alt }) => {
+                  const asset = out.assets.find((a) =>
+                    src?.startsWith(`assets/${a.id}.`),
+                  );
+                  return asset?.mediaType.startsWith("image/") ? (
+                    <img
+                      src={`data:${asset.mediaType};base64,${asset.data}`}
+                      alt={alt || asset.filename}
+                    />
+                  ) : (
+                    <span>{alt || "Attachment"}</span>
+                  );
+                },
+              }}
+            >
+              {out.markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "")}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <pre aria-label="Plain publication preview">{out.markdown}</pre>
+        )}
       </details>
       <p className="small-note">
         Trash is always excluded. This publishes a snapshot of your outline, not

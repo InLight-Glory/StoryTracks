@@ -21,7 +21,19 @@ test("node-connected thoughts and commentary survive exchange and follow publica
   thought.include = true;
   comment.text = "Echo the opening image here.";
   comment.include = true;
-  assert.ok(publication(p).markdown.includes("Connected node: Arrival"));
+  const output = publication(p).markdown;
+  assert.ok(
+    output.indexOf("#### Node: Arrival") < output.indexOf(thought.text),
+  );
+  assert.ok(
+    output.indexOf(thought.text) < output.indexOf("#### Node: Departure"),
+  );
+  assert.ok(
+    output.indexOf("#### Node: Departure") < output.indexOf(comment.text),
+  );
+  assert.match(output, /##### Author’s thoughts\n\n> I feel uneasy/);
+  assert.match(output, /##### Commentary\n\n> Echo the opening/);
+  assert.ok(!output.includes("## Context and side notes"));
   b.suspended = true;
   assert.ok(!publication(p).markdown.includes(comment.text));
   assert.ok(publication(p, true).markdown.includes(comment.text));
@@ -33,6 +45,60 @@ test("node-connected thoughts and commentary survive exchange and follow publica
   const copy = duplicateProject(p);
   assert.equal(copy.notes[0].ownerId, copy.nodes[0].id);
   assert.notEqual(copy.notes[0].ownerId, a.id);
+});
+
+test("publication keeps notes at every scope, including empty sections, without duplicates", () => {
+  const p = newProject("Scoped notes");
+  const a = newNode(p.chapters[0].id, "Arrival"),
+    b = newNode(p.chapters[0].id, "Departure");
+  p.nodes.push(a, b);
+  const empty = { ...p.sections[0], id: uid(), title: "Empty section" };
+  p.sections.push(empty);
+  const notes = [
+    [p.id, "Project context"],
+    [p.sections[0].id, "Section context"],
+    [p.chapters[0].id, "Chapter context"],
+    [a.id, "First paragraph\r\n\r\n- **A detail**\r\n- Another detail"],
+    [empty.id, "Empty section context"],
+  ];
+  for (const [ownerId, text] of notes)
+    p.notes.push({ id: uid(), ownerId, text, include: true });
+  const out = publication(p).markdown;
+  const inOrder = [
+    "## Project notes",
+    "Project context",
+    "## Section:",
+    "Section context",
+    "### Chapter",
+    "#### Chapter writing guidance",
+    "Chapter context",
+    "#### Node: Arrival",
+    "First paragraph",
+    "#### Node: Departure",
+    "## Section: Empty section",
+    "Empty section context",
+  ];
+  let previous = -1;
+  for (const text of inOrder) {
+    const position = out.indexOf(text, previous + 1);
+    assert.ok(position > previous, `${text} appears in its scope`);
+    previous = position;
+  }
+  assert.match(
+    out,
+    /> First paragraph\n> \n> - \*\*A detail\*\*\n> - Another detail/,
+  );
+  for (const [, text] of notes)
+    assert.equal(out.split(text.split("\r")[0]).length - 1, 1);
+  p.sections[0].suspended = true;
+  const activeOnly = publication(p).markdown;
+  assert.ok(!activeOnly.includes("Section context"));
+  assert.ok(!activeOnly.includes("Chapter context"));
+  assert.ok(!activeOnly.includes("First paragraph"));
+  assert.ok(activeOnly.includes("Empty section context"));
+  assert.ok(publication(p, true).markdown.includes("First paragraph"));
+  p.sections[0].trashed = true;
+  assert.ok(!publication(p, true).markdown.includes("First paragraph"));
 });
 test("locks protect connected notes and legacy notes can be assigned without losing text", () => {
   const p = newProject("Notes"),

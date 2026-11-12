@@ -1,3 +1,4 @@
+import { FormattedTextarea } from "./SelectionToolbar";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import {
@@ -120,11 +121,11 @@ export default function TemplateEditor({
         {draft.blocks.map((b, i) => (
           <div className="template-block" key={b.id}>
             {b.type === "text" ? (
-              <textarea
+              <FormattedTextarea
                 aria-label={`Template text ${i + 1}`}
                 value={b.text}
-                onChange={(e) =>
-                  update((t) => (t.blocks[i].text = e.target.value))
+                onValueChange={(value) =>
+                  update((t) => (t.blocks[i].text = value))
                 }
               />
             ) : (

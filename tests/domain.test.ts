@@ -56,7 +56,7 @@ test("canvas areas preserve notes through archives and publish only opted-in con
     include: true,
   });
   const output = publication(p).markdown;
-  assert.ok(output.includes("### Highlight: A recurring image"));
+  assert.ok(output.includes("### Commentary: A recurring image"));
   assert.ok(output.includes("Keep the red door"));
   assert.ok(!output.includes("Context remains private"));
   const backup = await archiveBlob(p);

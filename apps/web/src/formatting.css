@@ -1,0 +1,41 @@
+.selection-toolbar {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 5px 24px var(--shadow);
+}
+.selection-toolbar .icon-button {
+  width: 31px;
+  height: 31px;
+  flex-shrink: 0;
+}
+.selection-toolbar button:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.prose mark,
+.publication-formatted mark {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.prose u,
+.publication-formatted u {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.canvas-scroll.pan-ready,
+.canvas-scroll.pan-ready * {
+  cursor: grab;
+}
+.canvas-scroll.is-panning,
+.canvas-scroll.is-panning * {
+  cursor: grabbing;
+  user-select: none;
+}

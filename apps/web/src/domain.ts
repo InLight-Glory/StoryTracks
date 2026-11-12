@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { inkSchema, validateInk } from "./ink";
 
 export const uid = () => crypto.randomUUID();
 const id = z.string().uuid();
@@ -54,12 +55,15 @@ export const blockSchema = z.object({
   assetId: id.optional(),
   caption: z.string().default(""),
   alt: z.string().default(""),
+  drawing: inkSchema.optional(),
 });
 export const nodeSchema = z.object({
   id,
   chapterId: id,
   title: z.string(),
-  kind: z.enum(["beat", "scene", "note", "turn"]).default("beat"),
+  kind: z
+    .enum(["beat", "scene", "note", "turn", "handwritten"])
+    .default("beat"),
   blocks: z.array(blockSchema),
   templateId: id.optional(),
   ...state,
@@ -74,6 +78,10 @@ export const projectSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   metadata: z.record(z.string(), z.string()),
+  annotations: z
+    .array(z.object({ ownerId: id, drawing: inkSchema }))
+    .max(1000)
+    .optional(),
   workbook: z
     .object({
       templateId: z.string(),
@@ -565,6 +573,11 @@ export function validateProject(input: unknown): Project {
     ...p.nodes.flatMap((n) => n.blocks),
     ...p.templates.flatMap((t) => t.blocks),
   ]) {
+    if (b.drawing) {
+      if (b.type !== "image")
+        throw new Error("Handwriting must have an image block.");
+      validateInk(b.drawing);
+    }
     if (
       b.type !== "text" &&
       !p.assets.some(
@@ -576,6 +589,19 @@ export function validateProject(input: unknown): Project {
   for (const r of p.resources)
     if (r.assetId && !p.assets.some((a) => a.id === r.assetId))
       throw new Error("Resource attachment is missing.");
+  const annotationOwners = new Set<string>();
+  for (const annotation of p.annotations || []) {
+    if (annotationOwners.has(annotation.ownerId))
+      throw new Error("Duplicate annotation layer.");
+    annotationOwners.add(annotation.ownerId);
+    if (
+      annotation.ownerId !== p.id &&
+      !p.chapters.some((c) => c.id === annotation.ownerId) &&
+      !p.sections.some((s) => s.id === annotation.ownerId)
+    )
+      throw new Error("Annotation owner is missing.");
+    validateInk(annotation.drawing);
+  }
   for (const n of p.notes) {
     if (n.ownerId !== p.id && !getItem(p, n.ownerId))
       throw new Error("Note owner is missing.");
@@ -591,45 +617,35 @@ export function validateProject(input: unknown): Project {
 
 export function demoProject(): Project {
   const p = newProject(
-    "The Cartographer’s Daughter",
-    "Some places can only be found by getting lost.",
+    "The Parable of the Sower",
+    "Matthew 13:1–9, 18–23 — King James Version",
   );
   p.metadata = {
-    author: "Eleanor Hayes",
-    genre: "Literary mystery",
-    audience: "Adult",
+    author: "Matthew",
+    genre: "Biblical parable",
+    audience: "General",
     language: "English",
-    style: "Atmospheric, intimate, quietly lyrical",
-    tone: "Reflective",
-    mood: "Quiet unease",
-    pov: "Third person, limited",
+    style: "King James Version",
+    tone: "Instructive, reflective",
+    mood: "Contemplative",
+    pov: "Third-person narration with direct speech",
     tense: "Past",
     pacing: "Moderate",
-    targetLength: "80,000 words",
-    instructions: "Let the landscape carry what the characters cannot say.",
+    targetLength: "Matthew 13:1–9, 18–23",
+    instructions:
+      "Preserve the King James Version scripture text and verse references. Keep commentary separate from the passage.",
   };
-  p.sections[0].title = "The return";
-  const second = newSection("The uncharted");
-  const third = newSection("A way home");
-  p.sections.push(second, third);
-  p.chapters[0].title = "A town that remembers";
-  p.chapters[0].metadata = {
-    mood: "Nostalgic, with an undercurrent of unease",
-    pacing: "Slow",
-  };
+  p.sections[0].title = "Matthew 13";
+  p.chapters[0].title = "The parable of the sower";
   p.chapters.push(
-    newChapter(p.sections[0].id, "The room above the shop"),
-    newChapter(p.sections[0].id, "Lines that lead nowhere"),
-    newChapter(second.id, "Beyond the river"),
-    newChapter(second.id, "An unfinished map"),
-    newChapter(third.id, "What we choose to keep"),
+    newChapter(p.sections[0].id, "Jesus explains the parable"),
   );
   const first = p.chapters[0].id;
   p.nodes.push(
     newNode(
       first,
-      "The last train to Bellwether",
-      "After twelve years away, Mara steps onto the platform with one suitcase and a letter she has not opened.\n\nThe station clock is still seven minutes slow. Some things, she thinks, have learned how to stay.",
+      "Teaching by the sea — Matthew 13:1–2",
+      "1 The same day went Jesus out of the house, and sat by the sea side.\n\n2 And great multitudes were gathered together unto him, so that he went into a ship, and sat; and the whole multitude stood on the shore.",
     ),
   );
   p.nodes[0].kind = "scene";
@@ -637,71 +653,103 @@ export function demoProject(): Project {
   p.nodes.push(
     newNode(
       first,
-      "A familiar stranger",
-      "The man at the ticket window knows her name. He asks if she has come for the shop.\n\nShe has come for her father. She does not correct him.",
+      "A sower went forth — Matthew 13:3",
+      "3 And he spake many things unto them in parables, saying, Behold, a sower went forth to sow;",
     ),
   );
   p.nodes[1].kind = "beat";
-  p.nodes[1].liberty = 5;
   p.nodes.push(
     newNode(
       first,
-      "The map in the window",
-      "Her father’s shop is exactly as she remembers, except for the map in the window: a careful rendering of Bellwether with a street that does not exist.",
+      "By the way side — Matthew 13:4",
+      "4 And when he sowed, some seeds fell by the way side, and the fowls came and devoured them up:",
     ),
   );
-  p.nodes[2].kind = "turn";
-  p.nodes[2].importance = 11;
-  p.nodes[2].ending = 80;
+  p.nodes[2].kind = "beat";
   p.nodes.push(
     newNode(
       first,
-      "A key, and a question",
-      "Under the familiar loose stone, a brass key waits in an envelope. On the envelope, in her father’s handwriting: “Which way is home?”",
+      "Stony places — Matthew 13:5–6",
+      "5 Some fell upon stony places, where they had not much earth: and forthwith they sprung up, because they had no deepness of earth:\n\n6 And when the sun was up, they were scorched; and because they had no root, they withered away.",
     ),
   );
-  p.nodes[3].kind = "scene";
+  p.nodes[3].kind = "beat";
   p.nodes.push(
     newNode(
-      p.chapters[1].id,
-      "Everything in its place",
-      "The room smells of paper, cedar, and the sea. Every drawer is labeled. One is empty.",
+      first,
+      "Among thorns — Matthew 13:7",
+      "7 And some fell among thorns; and the thorns sprung up, and choked them:",
+    ),
+    newNode(
+      first,
+      "Good ground — Matthew 13:8",
+      "8 But other fell into good ground, and brought forth fruit, some an hundredfold, some sixtyfold, some thirtyfold.",
+    ),
+    newNode(
+      first,
+      "Ears to hear — Matthew 13:9",
+      "9 Who hath ears to hear, let him hear.",
     ),
   );
+  p.nodes[5].kind = "turn";
+  p.nodes[5].importance = 11;
+  p.nodes[5].ending = 80;
+  const explanation = p.chapters[1].id;
   p.nodes.push(
     newNode(
-      p.chapters[2].id,
-      "An impossible address",
-      "Mara walks to the street on the map. The road ends at the water.",
+      explanation,
+      "Hear the parable — Matthew 13:18",
+      "18 Hear ye therefore the parable of the sower.",
+    ),
+    newNode(
+      explanation,
+      "Hearing without understanding — Matthew 13:19",
+      "19 When any one heareth the word of the kingdom, and understandeth it not, then cometh the wicked one, and catcheth away that which was sown in his heart. This is he which received seed by the way side.",
+    ),
+    newNode(
+      explanation,
+      "Without root — Matthew 13:20–21",
+      "20 But he that received the seed into stony places, the same is he that heareth the word, and anon with joy receiveth it;\n\n21 Yet hath he not root in himself, but dureth for a while: for when tribulation or persecution ariseth because of the word, by and by he is offended.",
+    ),
+    newNode(
+      explanation,
+      "The cares of this world — Matthew 13:22",
+      "22 He also that received seed among the thorns is he that heareth the word; and the care of this world, and the deceitfulness of riches, choke the word, and he becometh unfruitful.",
+    ),
+    newNode(
+      explanation,
+      "Understanding and bearing fruit — Matthew 13:23",
+      "23 But he that received seed into the good ground is he that heareth the word, and understandeth it; which also beareth fruit, and bringeth forth, some an hundredfold, some sixty, some thirty.",
     ),
   );
   p.notes.push(
     {
       id: uid(),
-      ownerId: p.nodes[2].id,
-      text: "The impossible street is the first real fracture in the familiar. Keep it small. No explanation yet.",
+      ownerId: p.nodes[5].id,
+      text: "Compare the good ground in verse 8 with Jesus’ explanation in verse 23: hearing, understanding, and bearing fruit.",
       include: false,
     },
     {
       id: uid(),
       ownerId: p.id,
-      text: "Recurring motifs: maps, inherited silences, the unreliable comfort of familiar places.",
+      text: "Follow the four places where seed falls: the way side, stony places, thorns, and good ground. Matthew 13:18–23 explains the responses to the word of the kingdom.",
       include: false,
     },
   );
   p.templates.push({
     id: uid(),
-    name: "The question of home",
-    title: "Which way is home?",
-    blocks: [textBlock("“Which way is home?”")],
+    name: "The call to hear",
+    title: "Ears to hear — Matthew 13:9",
+    blocks: [textBlock("9 Who hath ears to hear, let him hear.")],
     ...defaults,
   });
   p.resources.push({
     id: uid(),
-    title: "A note on Bellwether",
+    title: "Scripture source — Matthew 13",
     kind: "reference",
-    text: "A fictional coastal town. Once a harbor for survey ships; now a place people pass through. The sea is always audible, never quite visible.",
-    source: "World-building notes",
+    text: "Matthew 13:1–9 contains the setting and the parable of the sower. Matthew 13:18–23 contains Jesus’ explanation. Scripture text is from the King James Version; node titles and notes are editorial additions.",
+    source:
+      "https://www.biblegateway.com/passage/?search=Matthew+13%3A1-9%3B+18-23&version=KJV",
     createdAt: p.createdAt,
     include: false,
   });

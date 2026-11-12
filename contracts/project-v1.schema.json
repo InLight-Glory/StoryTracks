@@ -39,6 +39,90 @@
         "type": "string"
       }
     },
+    "annotations": {
+      "maxItems": 1000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "drawing": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100000
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100000
+              },
+              "strokes": {
+                "maxItems": 2000,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "color": {
+                      "type": "string",
+                      "pattern": "^#[0-9a-fA-F]{6}$"
+                    },
+                    "width": {
+                      "type": "number",
+                      "minimum": 0.5,
+                      "maximum": 40
+                    },
+                    "points": {
+                      "minItems": 1,
+                      "maxItems": 2048,
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": [
+                          {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100000
+                          },
+                          {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100000
+                          }
+                        ],
+                        "additionalItems": false,
+                        "minItems": 2,
+                        "maxItems": 2
+                      }
+                    }
+                  },
+                  "required": [
+                    "color",
+                    "width",
+                    "points"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "width",
+              "height",
+              "strokes"
+            ]
+          }
+        },
+        "required": [
+          "ownerId",
+          "drawing"
+        ]
+      }
+    },
     "workbook": {
       "type": "object",
       "properties": {
@@ -285,7 +369,8 @@
               "beat",
               "scene",
               "note",
-              "turn"
+              "turn",
+              "handwritten"
             ]
           },
           "blocks": {
@@ -322,6 +407,72 @@
                 "alt": {
                   "default": "",
                   "type": "string"
+                },
+                "drawing": {
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 100000
+                    },
+                    "height": {
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 100000
+                    },
+                    "strokes": {
+                      "maxItems": 2000,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "width": {
+                            "type": "number",
+                            "minimum": 0.5,
+                            "maximum": 40
+                          },
+                          "points": {
+                            "minItems": 1,
+                            "maxItems": 2048,
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                }
+                              ],
+                              "additionalItems": false,
+                              "minItems": 2,
+                              "maxItems": 2
+                            }
+                          }
+                        },
+                        "required": [
+                          "color",
+                          "width",
+                          "points"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "width",
+                    "height",
+                    "strokes"
+                  ]
                 }
               },
               "required": [
@@ -430,6 +581,72 @@
                 "alt": {
                   "default": "",
                   "type": "string"
+                },
+                "drawing": {
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 100000
+                    },
+                    "height": {
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 100000
+                    },
+                    "strokes": {
+                      "maxItems": 2000,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "color": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "width": {
+                            "type": "number",
+                            "minimum": 0.5,
+                            "maximum": 40
+                          },
+                          "points": {
+                            "minItems": 1,
+                            "maxItems": 2048,
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                }
+                              ],
+                              "additionalItems": false,
+                              "minItems": 2,
+                              "maxItems": 2
+                            }
+                          }
+                        },
+                        "required": [
+                          "color",
+                          "width",
+                          "points"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "width",
+                    "height",
+                    "strokes"
+                  ]
                 }
               },
               "required": [

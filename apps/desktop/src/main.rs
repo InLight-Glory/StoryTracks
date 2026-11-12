@@ -3,6 +3,13 @@ use serde_json::Value;
 use std::{io::Write, sync::Mutex};
 use storytracks_core::Store;
 use tauri::Manager;
+mod fonts;
+#[tauri::command]
+async fn list_system_fonts() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(fonts::installed)
+        .await
+        .map_err(|e| e.to_string())?
+}
 struct AppState(Mutex<Store>);
 #[tauri::command]
 fn list_projects(state: tauri::State<AppState>) -> Result<Vec<Value>, String> {
@@ -112,6 +119,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_system_fonts,
             list_projects,
             save_project,
             delete_project,

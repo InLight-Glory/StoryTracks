@@ -61,6 +61,30 @@ fn effective(map: &HashMap<&str, &Value>, item: &Value, state: &str) -> bool {
             .and_then(|id| map.get(id))
             .is_some_and(|p| effective(map, p, state))
 }
+fn validate_ink(drawing: &Value) -> Result<()> {
+    let dimension = |key: &str| drawing[key].as_f64().filter(|n| n.is_finite() && *n >= 1.0 && *n <= 100000.0).ok_or_else(|| "Invalid drawing dimensions.".to_string());
+    let width = dimension("width")?;
+    let height = dimension("height")?;
+    let strokes = list(drawing, "strokes")?;
+    require(strokes.len() <= 2000, "Too many drawing strokes.")?;
+    let mut total = 0;
+    for stroke in strokes {
+        let color = text(stroke, "color")?;
+        require(color.len() == 7 && color.starts_with('#') && color[1..].bytes().all(|b| b.is_ascii_hexdigit()), "Invalid ink color.")?;
+        require(stroke["width"].as_f64().is_some_and(|n| n.is_finite() && (0.5..=40.0).contains(&n)), "Invalid pen width.")?;
+        let points = list(stroke, "points")?;
+        require(!points.is_empty() && points.len() <= 2048, "Invalid stroke points.")?;
+        total += points.len();
+        for point in points {
+            let pair = point.as_array().ok_or("Invalid drawing point.")?;
+            require(pair.len() == 2, "Invalid drawing point.")?;
+            for (index, maximum) in [width, height].iter().enumerate() {
+                require(pair[index].as_f64().is_some_and(|n| n.is_finite() && n >= 0.0 && n <= *maximum), "Drawing point is outside its page.")?;
+            }
+        }
+    }
+    require(total <= 200000, "Drawing point limit exceeded.")
+}
 pub fn validate(p: &Value) -> Result<()> {
     require(p["schemaVersion"] == 1, "Unsupported project schema.")?;
     require(valid_id(&p["id"]), "Invalid project ID.")?;
@@ -136,7 +160,7 @@ pub fn validate(p: &Value) -> Result<()> {
             "Node has no chapter.",
         )?;
         require(
-            ["beat", "scene", "note", "turn"].contains(&text(n, "kind")?),
+            ["beat", "scene", "note", "turn", "handwritten"].contains(&text(n, "kind")?),
             "Invalid node kind.",
         )?;
         if let Some(t) = n.get("templateId") {
@@ -164,6 +188,10 @@ pub fn validate(p: &Value) -> Result<()> {
                 "Invalid or duplicate block ID.",
             )?;
             let kind = text(b, "type")?;
+            if let Some(drawing) = b.get("drawing") {
+                require(kind == "image", "Handwriting must have an image block.")?;
+                validate_ink(drawing)?;
+            }
             require(
                 ["text", "image", "audio"].contains(&kind),
                 "Invalid block type.",
@@ -178,6 +206,17 @@ pub fn validate(p: &Value) -> Result<()> {
                     "Incompatible media.",
                 )?;
             }
+        }
+    }
+    if p.get("annotations").is_some() {
+        let annotations = list(p, "annotations")?;
+        require(annotations.len() <= 1000, "Too many annotation layers.")?;
+        let mut owners = HashSet::new();
+        for layer in annotations {
+            let owner = text(layer, "ownerId")?;
+            require(owners.insert(owner), "Duplicate annotation layer.")?;
+            require(owner == text(p, "id")? || chapters.contains(owner) || sections.contains(owner), "Annotation owner is missing.")?;
+            validate_ink(&layer["drawing"])?;
         }
     }
     for t in list(p, "templates")? {
@@ -366,6 +405,8 @@ pub fn validate_transition(old: &Value, new: &Value) -> Result<()> {
             .filter(|n| n["ownerId"].as_str() == Some(*id))
             .collect();
         require(a == b, "A locked note cannot be changed.")?;
+        let annotations_for = |project: &Value| project["annotations"].as_array().into_iter().flatten().filter(|a| a["ownerId"] == *id).cloned().collect::<Vec<_>>();
+        require(annotations_for(old) == annotations_for(new), "A locked annotation cannot be changed.")?;
         if item.get("blocks").is_some() {
             let content = if let Some(t) = item.get("templateId") {
                 list(old, "templates")?
@@ -530,6 +571,31 @@ fn hydrate(dir: &std::path::Path, document: &str) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn handwriting_and_private_annotations_round_trip() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!("../../../contracts/handwriting-fixtures.json")).unwrap();
+        let project = fixture["project"].clone();
+        super::validate(&project).unwrap();
+        let published = super::publish::publication(&project, false).unwrap();
+        assert_eq!(published.markdown, fixture["markdown"].as_str().unwrap());
+        let mut without_annotations = project.clone();
+        without_annotations.as_object_mut().unwrap().remove("annotations");
+        assert_eq!(published.markdown, super::publish::publication(&without_annotations, false).unwrap().markdown);
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = super::Store::open(dir.path().to_path_buf()).unwrap();
+        store.save(project.clone(), 0).unwrap();
+        let loaded = store.list().unwrap().remove(0);
+        assert_eq!(loaded["annotations"], project["annotations"]);
+        assert_eq!(loaded["nodes"][0]["blocks"], project["nodes"][0]["blocks"]);
+        let mut invalid = project.clone();
+        invalid["nodes"][0]["blocks"][0]["drawing"]["strokes"][0]["points"][0][0] = serde_json::json!(1001);
+        assert!(super::validate(&invalid).is_err());
+        let mut locked = project.clone();
+        locked["chapters"][0]["locked"] = serde_json::json!(true);
+        let mut changed = locked.clone();
+        changed["annotations"][0]["drawing"]["strokes"] = serde_json::json!([]);
+        assert!(super::validate_transition(&locked, &changed).is_err());
+    }
     use super::*;
     #[test]
     fn durable_storage_and_revision_safe_snapshot() {

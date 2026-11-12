@@ -164,6 +164,40 @@ fn title(p: &Value, n: &Value) -> String {
         line.chars().take(60).collect()
     }
 }
+fn append_notes(p: &Value, owner: &str, level: usize, lines: &mut Vec<String>) -> Result<()> {
+    for note in list(p, "notes")?
+        .iter()
+        .filter(|n| n["include"] == true && n["ownerId"] == owner)
+    {
+        let label = match note["canvasArea"].as_str() {
+            Some("subcontext") => "Author’s thoughts",
+            Some("highlight") => "Commentary",
+            _ => "Notes",
+        };
+        let title = note["title"].as_str().unwrap_or("");
+        lines.extend([
+            format!(
+                "{} {label}{}",
+                "#".repeat(level),
+                if title.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {}", heading(title))
+                }
+            ),
+            "".into(),
+            text(note, "text")?
+                .replace("\r\n", "\n")
+                .replace('\r', "\n")
+                .split('\n')
+                .map(|line| format!("> {line}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            "".into(),
+        ]);
+    }
+    Ok(())
+}
 pub fn publication(p: &Value, suspended: bool) -> Result<Publication> {
     validate(p)?;
     let name = safe_name(text(p, "name")?);
@@ -211,191 +245,161 @@ pub fn publication(p: &Value, suspended: bool) -> Result<Publication> {
         "".into(),
     ];
     for (k, v) in p["metadata"].as_object().unwrap() {
-        lines.push(format!("{}: {}", label(k), v.as_str().unwrap()));
+        lines.push(format!("- {}: {}", label(k), v.as_str().unwrap()));
     }
     lines.extend(
         [
             "",
             "## Weight guide",
             "",
-            "Importance: 1–5.5; higher means more important.",
-            "Liberty: 1–5.5; higher allows more deviation.",
-            "Transition sharpness: 0–100; higher means more abrupt.",
+            "- Importance: 1–5.5; higher means more important.",
+            "- Liberty: 1–5.5; higher allows more deviation.",
+            "- Transition sharpness: 0–100; higher means more abrupt.",
             "",
         ]
         .map(String::from),
     );
-    let mut last_section = "";
-    let mut included = HashSet::from([text(p, "id")?.to_string()]);
-    for s in list(p, "sections")?.iter().filter(|s| active(s, suspended)) {
-        included.insert(text(s, "id")?.into());
+    if list(p, "notes")?
+        .iter()
+        .any(|n| n["include"] == true && n["ownerId"] == p["id"])
+    {
+        lines.extend(["## Project notes".into(), "".into()]);
+        append_notes(p, text(p, "id")?, 3, &mut lines)?;
     }
-    for c in chapters {
-        let section = map[text(c, "sectionId")?];
-        if last_section != text(section, "id")? {
-            lines.extend([
-                format!(
-                    "## Section: {}{}",
-                    heading(text(section, "title")?),
-                    if effective(&map, section, "suspended") {
-                        " [Suspended]"
-                    } else {
-                        ""
-                    }
-                ),
-                format!("Section ID: {}", text(section, "id")?),
-                "".into(),
-            ]);
-            last_section = text(section, "id")?;
-        }
-        let number = c["manualLabel"]
-            .as_str()
-            .map(String::from)
-            .unwrap_or_else(|| {
-                automatic
-                    .iter()
-                    .position(|a| a["id"] == c["id"])
-                    .map(|i| (i + 1).to_string())
-                    .unwrap_or("—".into())
-            });
+    for section in list(p, "sections")?.iter().filter(|s| active(s, suspended)) {
         lines.extend([
             format!(
-                "### Chapter {}: {}{}",
-                heading(&number),
-                heading(text(c, "title")?),
-                if effective(&map, c, "suspended") {
+                "## Section: {}{}",
+                heading(text(section, "title")?),
+                if effective(&map, section, "suspended") {
                     " [Suspended]"
                 } else {
                     ""
                 }
             ),
-            format!("Chapter ID: {}", text(c, "id")?),
+            format!("Section ID: {}", text(section, "id")?),
             "".into(),
         ]);
-        included.insert(text(c, "id")?.into());
-        let mut meta = p["metadata"].as_object().unwrap().clone();
-        for (k, v) in c["metadata"].as_object().unwrap() {
-            meta.insert(k.clone(), v.clone());
-        }
-        for (k, v) in &meta {
-            let value = v.as_str().unwrap();
-            lines.push(format!(
-                "{}: {} ({})",
-                label(k),
-                if value.is_empty() { "(cleared)" } else { value },
-                if c["metadata"].get(k).is_some() {
-                    "chapter override"
-                } else {
-                    "inherited"
-                }
-            ));
-        }
-        lines.push("".into());
-        for n in list(p, "nodes")?
+        append_notes(p, text(section, "id")?, 3, &mut lines)?;
+        for c in chapters
             .iter()
-            .filter(|n| n["chapterId"] == c["id"] && active(n, suspended))
+            .copied()
+            .filter(|c| c["sectionId"] == section["id"])
         {
-            included.insert(text(n, "id")?.into());
+            let number = c["manualLabel"]
+                .as_str()
+                .map(String::from)
+                .unwrap_or_else(|| {
+                    automatic
+                        .iter()
+                        .position(|a| a["id"] == c["id"])
+                        .map(|i| (i + 1).to_string())
+                        .unwrap_or("—".into())
+                });
             lines.extend([
                 format!(
-                    "#### Node: {}{}",
-                    heading(&title(p, n)),
-                    if effective(&map, n, "suspended") {
+                    "### Chapter {}: {}{}",
+                    heading(&number),
+                    heading(text(c, "title")?),
+                    if effective(&map, c, "suspended") {
                         " [Suspended]"
                     } else {
                         ""
                     }
                 ),
-                format!("Node ID: {}", text(n, "id")?),
-                format!(
-                    "Importance: {:.1}",
-                    n["importance"].as_i64().unwrap() as f64 / 2.0
-                ),
-                format!(
-                    "Liberty: {:.1}",
-                    n["liberty"].as_i64().unwrap() as f64 / 2.0
-                ),
-                format!(
-                    "Beginning sharpness: {} ({})",
-                    n["beginning"],
-                    sharpness(n["beginning"].as_i64().unwrap())
-                ),
-                format!(
-                    "Ending sharpness: {} ({})",
-                    n["ending"],
-                    sharpness(n["ending"].as_i64().unwrap())
-                ),
+                format!("Chapter ID: {}", text(c, "id")?),
+                "".into(),
+                "#### Chapter writing guidance".into(),
                 "".into(),
             ]);
-            for b in blocks(p, n) {
-                let kind = text(b, "type")?;
-                let caption = text(b, "caption")?;
-                if kind == "text" {
-                    lines.push(text(b, "text")?.into());
-                } else {
-                    let alt = text(b, "alt")?;
-                    lines.push(media(
-                        p,
-                        text(b, "assetId")?,
-                        if alt.is_empty() { caption } else { alt },
-                        kind == "image",
-                        &mut used,
-                    )?);
+            let mut meta = p["metadata"].as_object().unwrap().clone();
+            for (k, v) in c["metadata"].as_object().unwrap() {
+                meta.insert(k.clone(), v.clone());
+            }
+            for (k, v) in &meta {
+                let value = v.as_str().unwrap();
+                lines.push(format!(
+                    "- {}: {} ({})",
+                    label(k),
+                    if value.is_empty() { "(cleared)" } else { value },
+                    if c["metadata"].get(k).is_some() {
+                        "chapter override"
+                    } else {
+                        "inherited"
+                    }
+                ));
+            }
+            lines.push("".into());
+            append_notes(p, text(c, "id")?, 4, &mut lines)?;
+            for n in list(p, "nodes")?
+                .iter()
+                .filter(|n| n["chapterId"] == c["id"] && active(n, suspended))
+            {
+                lines.extend([
+                    format!(
+                        "#### Node: {}{}",
+                        heading(&title(p, n)),
+                        if effective(&map, n, "suspended") {
+                            " [Suspended]"
+                        } else {
+                            ""
+                        }
+                    ),
+                    format!("Node ID: {}", text(n, "id")?),
+                    "".into(),
+                    format!(
+                        "- Importance: {:.1}",
+                        n["importance"].as_i64().unwrap() as f64 / 2.0
+                    ),
+                    format!(
+                        "- Liberty: {:.1}",
+                        n["liberty"].as_i64().unwrap() as f64 / 2.0
+                    ),
+                    format!(
+                        "- Beginning sharpness: {} ({})",
+                        n["beginning"],
+                        sharpness(n["beginning"].as_i64().unwrap())
+                    ),
+                    format!(
+                        "- Ending sharpness: {} ({})",
+                        n["ending"],
+                        sharpness(n["ending"].as_i64().unwrap())
+                    ),
+                    "".into(),
+                ]);
+                for b in blocks(p, n) {
+                    let kind = text(b, "type")?;
+                    let caption = text(b, "caption")?;
+                    if kind == "text" {
+                        lines.push(text(b, "text")?.into());
+                    } else {
+                        let alt = text(b, "alt")?;
+                        lines.push(media(
+                            p,
+                            text(b, "assetId")?,
+                            if alt.is_empty() { caption } else { alt },
+                            kind == "image",
+                            &mut used,
+                        )?);
+                    }
+                    lines.push("".into());
+                    if kind != "text" && !caption.is_empty() {
+                        lines.extend([caption.into(), "".into()]);
+                    }
+                    if kind == "audio" && !text(b, "text")?.is_empty() {
+                        lines.extend([format!("Transcript: {}", text(b, "text")?), "".into()]);
+                    }
                 }
-                lines.push("".into());
-                if kind != "text" && !caption.is_empty() {
-                    lines.extend([caption.into(), "".into()]);
-                }
-                if kind == "audio" && !text(b, "text")?.is_empty() {
-                    lines.extend([format!("Transcript: {}", text(b, "text")?), "".into()]);
-                }
+                append_notes(p, text(n, "id")?, 5, &mut lines)?;
             }
         }
     }
-    let notes: Vec<_> = list(p, "notes")?
-        .iter()
-        .filter(|n| n["include"] == true && included.contains(n["ownerId"].as_str().unwrap()))
-        .collect();
     let refs: Vec<_> = list(p, "resources")?
         .iter()
         .filter(|r| r["include"] == true && r["kind"] == "reference")
         .collect();
-    if !notes.is_empty() || !refs.is_empty() {
-        lines.extend(["## Context and side notes".into(), "".into()]);
-        for n in notes {
-            if let Some(area) = n["canvasArea"].as_str() {
-                let label = if area == "subcontext" {
-                    "Sub-context"
-                } else {
-                    "Highlight"
-                };
-                let title = n["title"].as_str().unwrap_or("");
-                lines.extend([
-                    format!(
-                        "### {label}{}",
-                        if title.is_empty() {
-                            String::new()
-                        } else {
-                            format!(": {}", heading(title))
-                        }
-                    ),
-                    "".into(),
-                ]);
-            }
-            if n.get("canvasArea").is_some() {
-                if let Some(node) = list(p, "nodes")?
-                    .iter()
-                    .find(|node| node["id"] == n["ownerId"])
-                {
-                    lines.push(format!("Connected node: {}", heading(&title(p, node))));
-                }
-            }
-            lines.extend([
-                format!("Scope ID: {}", text(n, "ownerId")?),
-                text(n, "text")?.into(),
-                "".into(),
-            ]);
-        }
+    if !refs.is_empty() {
+        lines.extend(["## Reference material".into(), "".into()]);
         for r in refs {
             lines.extend([
                 format!("### {}", heading(text(r, "title")?)),

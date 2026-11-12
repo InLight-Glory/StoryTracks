@@ -1,3 +1,4 @@
+import { FormattedTextarea } from "./SelectionToolbar";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -261,15 +262,15 @@ export default function PlanningWorkspace({
                     {String(i + 1).padStart(2, "0")} / {prompt.category}
                   </div>
                   <h2>{prompt.question}</h2>
-                  <textarea
+                  <FormattedTextarea
                     aria-label={prompt.question}
                     placeholder="Your answer can begin with a single thought…"
                     value={prompt.answer}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       change((p) => {
                         workbook(p).prompts.find(
                           (q) => q.id === prompt.id,
-                        )!.answer = e.target.value;
+                        )!.answer = value;
                       })
                     }
                   />
@@ -389,15 +390,15 @@ export default function PlanningWorkspace({
                       })
                     }
                   />
-                  <textarea
+                  <FormattedTextarea
                     aria-label={`World entry ${i + 1} details`}
                     placeholder="Describe its rules, history, contradictions, and connections to the story…"
                     value={entry.description}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       change((p) => {
                         workbook(p).world.find(
                           (w) => w.id === entry.id,
-                        )!.description = e.target.value;
+                        )!.description = value;
                       })
                     }
                   />
@@ -462,12 +463,12 @@ export default function PlanningWorkspace({
                 </div>
                 <label>
                   Statement or quote
-                  <textarea
+                  <FormattedTextarea
                     aria-label="Statement or quote"
                     placeholder="Paste the statement you want to understand…"
                     value={q.statement}
-                    onChange={(e) =>
-                      updateQuestion("statement", e.target.value)
+                    onValueChange={(value) =>
+                      updateQuestion("statement", value)
                     }
                   />
                 </label>
@@ -515,50 +516,50 @@ export default function PlanningWorkspace({
                 <span className="eyebrow">02 / EXPLORE THE NEED</span>
                 <label>
                   The question beneath the statement
-                  <textarea
+                  <FormattedTextarea
                     aria-label="Underlying question"
                     placeholder="What is someone really trying to understand or solve?"
                     value={q.question}
-                    onChange={(e) => updateQuestion("question", e.target.value)}
+                    onValueChange={(value) => updateQuestion("question", value)}
                   />
                 </label>
                 <label>
                   Insight & assumptions
-                  <textarea
+                  <FormattedTextarea
                     aria-label="Question insight"
                     placeholder="Why does this answer resonate? What does it assume? When might it not apply?"
                     value={q.insight}
-                    onChange={(e) => updateQuestion("insight", e.target.value)}
+                    onValueChange={(value) => updateQuestion("insight", value)}
                   />
                 </label>
                 <label>
                   Other possible answers
-                  <textarea
+                  <FormattedTextarea
                     aria-label="Alternative answers"
                     placeholder="List other explanations, approaches, counterexamples, or stories that answer the same question."
                     value={q.alternatives}
-                    onChange={(e) =>
-                      updateQuestion("alternatives", e.target.value)
+                    onValueChange={(value) =>
+                      updateQuestion("alternatives", value)
                     }
                   />
                 </label>
                 <span className="eyebrow">03 / FIND YOUR READERS</span>
                 <label>
                   Who shares this question?
-                  <textarea
+                  <FormattedTextarea
                     aria-label="Question audience"
                     placeholder="Describe the people, situation, or frustration behind the question."
                     value={q.audience}
-                    onChange={(e) => updateQuestion("audience", e.target.value)}
+                    onValueChange={(value) => updateQuestion("audience", value)}
                   />
                 </label>
                 <label>
                   Marketing hook
-                  <textarea
+                  <FormattedTextarea
                     aria-label="Marketing hook"
                     placeholder="Invite readers with a clear question they recognize. Keep the promise honest."
                     value={q.hook}
-                    onChange={(e) => updateQuestion("hook", e.target.value)}
+                    onValueChange={(value) => updateQuestion("hook", value)}
                   />
                 </label>
                 <button

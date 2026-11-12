@@ -1,5 +1,11 @@
 # StoryTracks PHP edition
 
+The writing desk includes private **Hand annotation** overlays and **Hand written** drawing nodes. Drawing nodes publish PNG image references; overlays remain only in project data and editable backups. The writing page supports half-width, side swapping, and centered 90%-width full-screen mode at full window height. Create drawing nodes through the regular node-type selector. All themes gently shade even right-panel sections and, more faintly, odd outline chapter groups. Sub-context and Highlight have independent collapse controls, start open, and remember the view on this device.
+
+**Download for Windows** appears on the sign-in screen and in the app header. It links to `/StoryTracks-setup.msi` at the website root. Keep the installer there when deploying the web package; the installer is hosted separately from this ZIP.
+
+The Settings cog offers **Fonts**, initially Verdana, with a preferred default, five recent choices, and independent font sizes saved in this browser. **Load system fonts** asks compatible browsers for access to fonts installed on the visitor's device; manual font-name entry is also available. Select text for formatting controls. Space-drag or middle-button drag pans the canvas in both directions; **Reset canvas position** restores the starting view.
+
 Requires PHP 8.2 or newer with PDO, PDO_SQLITE, JSON, hash, iconv, and session. No Composer, Rust, Node, ZipArchive, or frontend build tools are needed on the deployment server. Assets, fonts (system fonts), and scripts are served locally. This build was exercised with PHP 8.2.12; additional PHP versions have not been tested in this workspace.
 
 1. Copy `config.example.php` to `config.php` and set an absolute `data_dir` outside the web root and outside OneDrive/Dropbox/cloud-sync directories.

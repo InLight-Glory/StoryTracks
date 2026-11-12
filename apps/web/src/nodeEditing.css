@@ -1,0 +1,96 @@
+.node-body [data-block-id] {
+  display: flow-root;
+}
+.node-card.is-editing {
+  position: relative;
+}
+.node-edit.node-body {
+  padding: 5px 21px 18px;
+}
+.compact .node-edit.node-body {
+  padding-bottom: 11px;
+}
+.node-edit .block-editor {
+  margin: 0;
+}
+.node-edit .text-block-editor + .text-block-editor {
+  margin-top: 9px;
+}
+:root .node-edit .node-title-input,
+:root .node-edit .node-text-input {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  box-shadow: none;
+  font-family: inherit;
+}
+:root .node-edit .node-title-input {
+  font-family: var(--serif);
+  font-size: var(--font-subtitles);
+  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+:root .compact .node-edit .node-title-input {
+  margin-bottom: 5px;
+}
+:root .node-edit .node-text-input {
+  font-size: var(--font-main);
+  line-height: 1.8;
+  color: var(--muted);
+}
+.node-edit .block-tools {
+  top: 0;
+  bottom: auto;
+  right: calc(100% + 2px);
+  flex-direction: column;
+  z-index: 3;
+  opacity: 0;
+}
+.node-edit .block-editor:hover .block-tools,
+.node-edit .block-editor:focus-within .block-tools {
+  opacity: 1;
+}
+.node-edit .block-tools .icon-button {
+  width: 18px;
+  height: 18px;
+}
+.is-editing .node-footer {
+  visibility: hidden;
+}
+.node-edit .edit-toolbar {
+  line-height: 1.2;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--editing-footer-height, 48px);
+  padding: 4px 12px;
+  gap: 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  z-index: 2;
+}
+.node-edit .edit-toolbar .primary {
+  padding: 4px 8px;
+}
+@media (max-width: 900px) {
+  .node-edit.node-body {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .node-edit.node-body {
+    padding-inline: 12px;
+  }
+  .node-edit .block-tools {
+    right: calc(100% - 6px);
+  }
+}

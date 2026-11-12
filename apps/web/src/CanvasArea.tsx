@@ -1,5 +1,8 @@
+import { FormattedTextarea } from "./SelectionToolbar";
 import {
   Link2,
+  ChevronLeft,
+  ChevronRight,
   LockKeyhole,
   Plus,
   Sparkles,
@@ -22,12 +25,16 @@ export default function CanvasArea({
   selected,
   selectNode,
   change,
+  collapsed = false,
+  onToggle,
 }: {
   project: Project;
   area: "subcontext" | "highlight";
   selected?: StoryNode;
   selectNode: (node: StoryNode, focus?: boolean) => void;
   change: (mutate: (project: Project) => void) => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }) {
   const context = area === "subcontext",
     title = context ? "Sub-context" : "Highlight";
@@ -101,7 +108,7 @@ export default function CanvasArea({
           value={note.title || ""}
           onChange={(e) => update({ title: e.target.value })}
         />
-        <textarea
+        <FormattedTextarea
           aria-label={label}
           disabled={disabled}
           placeholder={
@@ -110,7 +117,7 @@ export default function CanvasArea({
               : "What would you like to say about this node? Add your commentary…"
           }
           value={note.text}
-          onChange={(e) => update({ text: e.target.value })}
+          onValueChange={(value) => update({ text: value })}
         />
         <label className="canvas-note-inclusion">
           <input
@@ -124,11 +131,38 @@ export default function CanvasArea({
       </section>
     );
   };
+  if (collapsed)
+    return (
+      <aside
+        className={`canvas-area ${area} is-collapsed`}
+        aria-label={`${title} canvas area`}
+      >
+        <button
+          className="canvas-area-expand"
+          aria-label={`Expand ${title}`}
+          aria-expanded={false}
+          onClick={onToggle}
+        >
+          {context ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          <span>{title}</span>
+        </button>
+      </aside>
+    );
   return (
     <aside
       className={`canvas-area ${area} ${node ? "has-connected-node" : ""}`}
       aria-label={`${title} canvas area`}
     >
+      {onToggle && (
+        <button
+          className="icon-button canvas-area-toggle"
+          aria-label={`Collapse ${title}`}
+          aria-expanded={true}
+          onClick={onToggle}
+        >
+          {context ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+        </button>
+      )}
       <header className="canvas-area-heading">
         <span className="eyebrow">
           {context ? "01 / THOUGHTS & FEELINGS" : "03 / AUTHOR’S COMMENTARY"}

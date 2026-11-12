@@ -1,0 +1,123 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "id": "a1f448f8-aae1-4738-a66c-7e6c1f0b3ff2",
+    "revision": 0,
+    "name": "Handwriting conformance",
+    "description": "",
+    "createdAt": "2026-11-12T01:25:11.135Z",
+    "updatedAt": "2026-11-12T01:25:11.136Z",
+    "metadata": {
+      "language": "English"
+    },
+    "sections": [
+      {
+        "id": "2110d23b-c6b8-4f7f-8cb8-db0e5d4f26b1",
+        "title": "Part one",
+        "locked": false,
+        "suspended": false,
+        "trashed": false
+      }
+    ],
+    "chapters": [
+      {
+        "id": "fd87334c-c2b0-40c0-bba6-467708e441c4",
+        "sectionId": "2110d23b-c6b8-4f7f-8cb8-db0e5d4f26b1",
+        "title": "Chapter one",
+        "manualLabel": null,
+        "metadata": {},
+        "locked": false,
+        "suspended": false,
+        "trashed": false
+      }
+    ],
+    "nodes": [
+      {
+        "id": "c733132f-94ce-452e-a3a8-2ee68b4a16d2",
+        "chapterId": "fd87334c-c2b0-40c0-bba6-467708e441c4",
+        "title": "A hand written idea",
+        "blocks": [
+          {
+            "id": "0b1e1b83-b416-4ff5-b4a9-0e6bd316e19a",
+            "type": "image",
+            "text": "",
+            "alt": "Hand written page",
+            "caption": "",
+            "drawing": {
+              "width": 1000,
+              "height": 1400,
+              "strokes": [
+                {
+                  "color": "#172b3a",
+                  "width": 4,
+                  "points": [
+                    [
+                      100,
+                      100
+                    ],
+                    [
+                      200,
+                      180
+                    ],
+                    [
+                      320,
+                      100
+                    ]
+                  ]
+                }
+              ]
+            },
+            "assetId": "2c4440b6-079c-4794-809b-f43b3452efae"
+          }
+        ],
+        "kind": "handwritten",
+        "locked": false,
+        "suspended": false,
+        "trashed": false,
+        "importance": 6,
+        "liberty": 2,
+        "beginning": 50,
+        "ending": 50
+      }
+    ],
+    "templates": [],
+    "notes": [],
+    "resources": [],
+    "assets": [
+      {
+        "id": "2c4440b6-079c-4794-809b-f43b3452efae",
+        "filename": "hand-written.png",
+        "mediaType": "image/png",
+        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jz1sAAAAASUVORK5CYII=",
+        "size": 68,
+        "hash": "ae34a8c7ecf4310c6749856a4f5ba249897008ba8ea105e69ad351ca2b76ffac"
+      }
+    ],
+    "annotations": [
+      {
+        "ownerId": "fd87334c-c2b0-40c0-bba6-467708e441c4",
+        "drawing": {
+          "width": 1000,
+          "height": 1400,
+          "strokes": [
+            {
+              "color": "#e64662",
+              "width": 8,
+              "points": [
+                [
+                  20,
+                  20
+                ],
+                [
+                  50,
+                  50
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "markdown": "---\nstorytrack_format: 1\nproject_id: \"a1f448f8-aae1-4738-a66c-7e6c1f0b3ff2\"\nproject_name: \"Handwriting conformance\"\nproject_revision: 0\n---\n\n# Handwriting conformance — StoryTrack\n\n\n\n## Project writing guidance\n\n- Language: English\n\n## Weight guide\n\n- Importance: 1–5.5; higher means more important.\n- Liberty: 1–5.5; higher allows more deviation.\n- Transition sharpness: 0–100; higher means more abrupt.\n\n## Section: Part one\nSection ID: 2110d23b-c6b8-4f7f-8cb8-db0e5d4f26b1\n\n### Chapter 1: Chapter one\nChapter ID: fd87334c-c2b0-40c0-bba6-467708e441c4\n\n#### Chapter writing guidance\n\n- Language: English (inherited)\n\n#### Node: A hand written idea\nNode ID: c733132f-94ce-452e-a3a8-2ee68b4a16d2\n\n- Importance: 3.0\n- Liberty: 1.0\n- Beginning sharpness: 50 (moderate)\n- Ending sharpness: 50 (moderate)\n\n![Hand written page](assets/2c4440b6-079c-4794-809b-f43b3452efae.png)\n"
+}

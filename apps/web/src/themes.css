@@ -1,0 +1,459 @@
+/* Semantic colors are set before the first React render in main.tsx. */
+:root {
+  --shadow: #00000026;
+  --scrim: #10131bb3;
+  --decoration: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* Quiet alternating groups, tuned to each palette. The outline is lighter. */
+html[data-theme="neon"] {
+  --section-stripe: #78caff0c;
+  --chapter-stripe: #78caff06;
+}
+html[data-theme="sunburst"] {
+  --section-stripe: #b65b0f0c;
+  --chapter-stripe: #b65b0f06;
+}
+html[data-theme="coffee"] {
+  --section-stripe: #edba990c;
+  --chapter-stripe: #edba9906;
+}
+html[data-theme="glass"] {
+  --section-stripe: #ffffff30;
+  --chapter-stripe: #ffffff18;
+}
+html[data-theme="frost"] {
+  --section-stripe: #3e628d0c;
+  --chapter-stripe: #3e628d06;
+}
+html[data-theme="morning"] {
+  --section-stripe: #4c6c390c;
+  --chapter-stripe: #4c6c3906;
+}
+html[data-theme="night"] {
+  --section-stripe: #9bbcff0c;
+  --chapter-stripe: #9bbcff06;
+}
+html[data-theme="evening"] {
+  --section-stripe: #e9b8d00c;
+  --chapter-stripe: #e9b8d006;
+}
+.inspector-section {
+  margin: 0 -10px 12px;
+  padding: 12px 10px;
+  border-radius: 6px;
+}
+.inspector-section:first-child {
+  padding-top: 0;
+}
+.inspector-section:nth-child(even of .inspector-section),
+.inspector-scroll > .resource-card:nth-child(even of .resource-card) {
+  background-color: var(--section-stripe);
+}
+.inspector-section > .inspector-section-head {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.inspector-section > .weight-control:last-child,
+.inspector-section > .field:last-child {
+  margin-bottom: 0;
+}
+.chapter-group:nth-child(odd of .chapter-group) {
+  background-color: var(--chapter-stripe);
+  border-radius: 5px;
+}
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+a {
+  color: var(--accent);
+}
+.theme-settings {
+  padding-bottom: 26px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.theme-settings > p {
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 10px 0 18px;
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.theme-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  text-align: left;
+}
+.theme-choice:hover:not(:disabled) {
+  background: var(--raised);
+}
+.theme-choice[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-choice-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  font-weight: 650;
+  color: var(--text);
+}
+.theme-choice-name > span {
+  color: var(--accent);
+}
+.theme-choice small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.theme-swatch {
+  display: grid;
+  grid-template-columns: 1fr 2.5fr 0.45fr;
+  gap: 5px;
+  width: 100%;
+  height: 49px;
+  padding: 7px;
+  border: 1px solid;
+  border-radius: 5px;
+}
+.theme-swatch > span {
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+/* Neon: distinct blue, green, and pink light on neutral ink surfaces. */
+html[data-theme="neon"] :is(.canvas-scroll, .dashboard) {
+  background-image:
+    radial-gradient(ellipse at 0% 20%, #168fff26, transparent 45%),
+    radial-gradient(ellipse at 100% 25%, #ff448a18, transparent 40%),
+    radial-gradient(ellipse at 50% 100%, #28ff791c, transparent 55%);
+  background-size: auto;
+}
+html[data-theme="neon"] .topbar {
+  background: linear-gradient(110deg, #0d2231, #0a161d 75%);
+  border-bottom-color: #399fff;
+  box-shadow: 0 1px 16px #399fff40;
+}
+html[data-theme="neon"] :is(.brand-mark, .main-area-label) {
+  filter: drop-shadow(0 0 6px #65ff9a99);
+}
+html[data-theme="neon"] :is(.canvas-area, .modal) {
+  background: linear-gradient(145deg, #10283b, var(--panel) 70%);
+  border-color: #399fff;
+  box-shadow:
+    inset 0 1px 0 #78caff40,
+    0 0 22px #168fff33;
+}
+html[data-theme="neon"] .node-card {
+  background: linear-gradient(125deg, #122630, #0c1920);
+}
+html[data-theme="neon"]
+  :is(.node-card.selected, .theme-choice[aria-pressed="true"]) {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 0 12px #65ff9a0c,
+    0 0 0 1px #65ff9a4d,
+    0 0 22px #65ff9a40;
+}
+html[data-theme="neon"] :is(.primary, .is-selected .track-marker) {
+  box-shadow:
+    0 0 10px #65ff9a80,
+    0 0 26px #65ff9a33;
+}
+html[data-theme="neon"] .workspace-tabs button[aria-selected="true"] {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 0 12px #65ff9a12,
+    0 0 12px #65ff9a26;
+}
+html[data-theme="neon"] .canvas-area.highlight {
+  background: linear-gradient(145deg, #2b1823, var(--panel) 70%);
+  border-color: #ff70a4;
+  box-shadow:
+    inset 0 1px 0 #ff91bd40,
+    0 0 22px #ff448a40;
+}
+html[data-theme="neon"]
+  .canvas-area.highlight
+  :is(
+    .canvas-area-heading > div,
+    .canvas-node-connection label,
+    .canvas-area-add
+  ) {
+  color: #ff91bd;
+}
+
+/* Sunburst: saturated gold and orange surround warm, pale writing paper. */
+html[data-theme="sunburst"] :is(.canvas-scroll, .dashboard) {
+  background-image:
+    radial-gradient(ellipse at 5% 0%, #ffc247b3, transparent 60%),
+    radial-gradient(ellipse at 100% 90%, #ff9c454d, transparent 60%);
+  background-size: auto;
+}
+html[data-theme="sunburst"] .topbar {
+  background: linear-gradient(110deg, #ffd35e, #ffe9a2 60%, #ffcc80);
+  border-bottom-color: #cf8b22;
+}
+html[data-theme="sunburst"] :is(.canvas-area, .project-cover) {
+  background: linear-gradient(145deg, #fff6d8, #ffe29e);
+  border-color: #d69c35;
+}
+html[data-theme="sunburst"] .canvas-area.highlight {
+  background: linear-gradient(145deg, #fff0c9, #ffd2a0);
+  border-color: #d68a3e;
+}
+html[data-theme="sunburst"] .node-card {
+  background: var(--card);
+  box-shadow: 0 6px 20px #aa5d1921;
+}
+html[data-theme="sunburst"] .node-card.selected {
+  border-color: #bd611b;
+  box-shadow:
+    0 0 0 1px #f4a53980,
+    0 8px 24px #aa5d1926;
+}
+html[data-theme="sunburst"] .primary {
+  background: linear-gradient(120deg, #ffcf4c, #ffa34c);
+  color: var(--text) !important;
+  border-color: #b66b20;
+  box-shadow: 0 3px 10px #c96f2026;
+}
+html[data-theme="sunburst"] .primary:hover:not(:disabled) {
+  background: linear-gradient(120deg, #ffdc72, #ffb76d);
+}
+html[data-theme="sunburst"] .workspace-tabs button[aria-selected="true"] {
+  background: #ffd35e;
+  color: var(--text);
+  border-color: #b66b20;
+}
+
+/* Glass: a visible backdrop passes through clear centers; reflective bands
+   and beveled rims supply gloss without placing overlays over editable text. */
+html[data-theme="glass"] :is(.app, .login, .loading) {
+  background:
+    linear-gradient(
+      125deg,
+      transparent 27%,
+      #ffffff80 27.2%,
+      #ffffff38 36%,
+      transparent 36.2%
+    ),
+    linear-gradient(
+      25deg,
+      transparent 48%,
+      #709eb029 48.2%,
+      #709eb014 64%,
+      transparent 64.2%
+    ),
+    radial-gradient(ellipse at 12% 12%, #e1f4f3 0%, transparent 48%),
+    radial-gradient(ellipse at 90% 60%, #b4cfdf 0%, transparent 55%),
+    linear-gradient(140deg, #c4e4ed, #dce9ec 55%, #bad9e2);
+  background-attachment: fixed;
+}
+html[data-theme="glass"]
+  :is(.canvas-panel, .canvas-scroll, .dashboard, .planning-workspace) {
+  background: transparent;
+}
+html[data-theme="glass"]
+  :is(.topbar, .outline-panel, .inspector, .canvas-toolbar, .canvas-bottom) {
+  background: linear-gradient(115deg, #ffffff73, #ffffff12 55%, #e5f6ff24);
+  backdrop-filter: blur(14px) saturate(115%);
+  border-color: #60879966;
+  box-shadow:
+    inset 0 1px 0 #ffffffed,
+    inset 1px 0 0 #ffffffa6,
+    inset -1px 0 0 #ffffff80;
+}
+html[data-theme="glass"]
+  :is(
+    .canvas-area,
+    .node-card,
+    .project-card,
+    .planning-card,
+    .project-cover,
+    .canvas-note
+  ) {
+  background:
+    linear-gradient(
+      115deg,
+      #ffffff00 22%,
+      #ffffff61 22.3%,
+      #ffffff14 36%,
+      #ffffff00 36.3%
+    ),
+    linear-gradient(
+      180deg,
+      #ffffff70 0%,
+      #ffffff12 13%,
+      #ffffff05 65%,
+      #d6f2ff29 100%
+    );
+  background-color: #ffffff12;
+  backdrop-filter: blur(3px) saturate(115%);
+  border: 1px solid #ffffffcc;
+  box-shadow:
+    inset 0 2px 1px #ffffffeb,
+    inset 2px 0 2px #ffffff80,
+    inset -1px -2px 2px #537f9673,
+    0 0 0 1px #537f9659,
+    0 10px 24px #294d6626;
+}
+html[data-theme="glass"] .canvas-area {
+  backdrop-filter: blur(6px) saturate(115%);
+}
+html[data-theme="glass"] .node-card.selected {
+  border-color: #ffffff;
+  box-shadow:
+    inset 0 2px 1px #ffffff,
+    inset 2px 0 2px #ffffff99,
+    inset -1px -2px 2px #537f9673,
+    0 0 0 1px var(--accent),
+    0 12px 28px #294d6633;
+}
+html[data-theme="glass"] .node-card-header {
+  background: linear-gradient(
+    180deg,
+    #ffffffa1,
+    #ffffff26 49%,
+    #ffffff05 51%,
+    #ffffff12
+  );
+  border-radius: 7px 7px 0 0;
+  box-shadow: 0 1px 0 #ffffff59;
+}
+html[data-theme="glass"] :is(.node-footer, .node-edit .edit-toolbar) {
+  background: linear-gradient(180deg, #ffffff80, #ffffff1f 45%, #a6c6d338);
+  border-top-color: #ffffffa6;
+  border-radius: 0 0 7px 7px;
+  box-shadow: inset 0 -1px 1px #ffffff80;
+}
+html[data-theme="glass"] :is(.canvas-note, .find-current, .font-preview) {
+  background-color: #ffffff33;
+}
+html[data-theme="glass"]
+  :is(input:not([type="range"]):not([type="checkbox"]), select, textarea):not(
+    .node-title-input
+  ):not(.node-text-input) {
+  background: #ffffff57;
+  border-color: #7293a580;
+  box-shadow:
+    inset 0 1px 3px #355b711a,
+    0 1px 0 #ffffffb3;
+}
+html[data-theme="glass"]
+  :is(.primary, .button, .workspace-tabs button, .theme-choice) {
+  background-image: linear-gradient(
+    180deg,
+    #ffffff66,
+    #ffffff0a 48%,
+    #ffffff00 51%,
+    #ffffff1a
+  );
+  box-shadow:
+    inset 0 1px 0 #ffffffa6,
+    0 1px 2px #294d661a;
+}
+html[data-theme="glass"] .modal {
+  background:
+    linear-gradient(
+      115deg,
+      transparent 28%,
+      #ffffff80 28.3%,
+      #ffffff0a 44%,
+      transparent 44.3%
+    ),
+    linear-gradient(180deg, #f8fcffd9, #edf6fbbf);
+  backdrop-filter: blur(20px) saturate(115%);
+  border-color: #ffffff;
+  box-shadow:
+    inset 0 2px 1px #ffffff,
+    inset -1px -2px 2px #537f9666,
+    0 0 0 1px #537f9659,
+    0 24px 80px #20344e40;
+}
+html[data-theme="glass"] .modal::backdrop {
+  background: #26395526;
+  backdrop-filter: blur(4px);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  html[data-theme="glass"]
+    :is(
+      .topbar,
+      .outline-panel,
+      .inspector,
+      .canvas-toolbar,
+      .canvas-bottom,
+      .canvas-area,
+      .node-card,
+      .project-card,
+      .planning-card,
+      .canvas-note
+    ) {
+    background-color: #edf3f8e6;
+  }
+}
+
+/* The picker previews the special treatments even from another theme. */
+.theme-swatch[data-theme-preview="neon"] {
+  background-image: linear-gradient(120deg, #168fff33, transparent) !important;
+  box-shadow: inset 0 0 12px #168fff33;
+}
+.theme-swatch[data-theme-preview="neon"] > :first-child {
+  background: #399fff !important;
+  box-shadow: 0 0 7px #399fff80;
+}
+.theme-swatch[data-theme-preview="neon"] > :nth-child(2) {
+  color: #65ff9a !important;
+  box-shadow: inset 0 0 0 1px #65ff9a99;
+}
+.theme-swatch[data-theme-preview="neon"] > :last-child {
+  background: #ff70a4 !important;
+  box-shadow: 0 0 9px #ff70a4a6;
+}
+.theme-swatch[data-theme-preview="sunburst"] {
+  background-image: linear-gradient(110deg, #ffd35e, #ffbb71) !important;
+}
+.theme-swatch[data-theme-preview="sunburst"] > :last-child {
+  background: #fba128 !important;
+}
+.theme-swatch[data-theme-preview="glass"] {
+  background-image: linear-gradient(
+    125deg,
+    #b4cfdf 25%,
+    #ffffff 25.5%,
+    #dce9ec 47%,
+    #aac7d7 47.5%
+  ) !important;
+}
+.theme-swatch[data-theme-preview="glass"] > :not(:last-child) {
+  background: linear-gradient(
+    180deg,
+    #ffffffa6,
+    #ffffff05 40%,
+    #ffffff26
+  ) !important;
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset -1px -1px 1px #537f9673,
+    0 0 0 1px #ffffff99;
+}
+@media (max-width: 360px) {
+  .theme-grid {
+    gap: 8px;
+  }
+  .theme-choice {
+    padding: 8px;
+  }
+}

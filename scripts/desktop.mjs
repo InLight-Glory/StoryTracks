@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, copyFileSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { resolve, join, delimiter } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const cargo = join(root, ".local", "toolchain", "cargo");
@@ -28,14 +34,21 @@ if (mode === "build") {
     join(root, "target", "release", "StoryTracks.exe"),
     join(root, "dist", "windows", "StoryTracks.exe"),
   );
-  const bundle = join(root, "target", "release", "bundle", "nsis");
-  if (existsSync(bundle)) {
-    const file = readdirSync(bundle).find((x) => x.endsWith("-setup.exe"));
-    if (file)
-      copyFileSync(
-        join(bundle, file),
-        join(root, "dist", "windows", "StoryTracks-setup.exe"),
-      );
-  }
+  const bundle = join(root, "target", "release", "bundle", "msi");
+  const file = existsSync(bundle)
+    ? readdirSync(bundle)
+        .filter((x) => x.endsWith(".msi"))
+        .sort(
+          (a, b) =>
+            statSync(join(bundle, b)).mtimeMs -
+            statSync(join(bundle, a)).mtimeMs,
+        )[0]
+    : undefined;
+  if (!file)
+    throw new Error("Windows build did not produce the MSI installer.");
+  copyFileSync(
+    join(bundle, file),
+    join(root, "dist", "windows", "StoryTracks-setup.msi"),
+  );
   console.log("Windows artifacts copied to dist/windows.");
 }
